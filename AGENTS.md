@@ -20,7 +20,27 @@ Do not add package dependencies by yourself. If a needed package is missing, tel
 
 ## Assumptions
 
-This code is for internal research use with mostly valid data. Do not over-engineer robustness. Add lightweight assertions or checks where they clarify assumptions, but avoid large validation frameworks, defensive wrappers, or excessive error handling.
+This code is for internal research use with mostly valid data. Do not over-engineer robustness. Add lightweight assertions or checks where they clarify assumptions, but avoid large validation frameworks, defensive wrappers, input argument type coercion, or excessive error handling.
+
+A bad example:
+
+```python
+def reconstruct_from_barycentric(
+    body_vertices: torch.Tensor,
+    body_faces: torch.Tensor,
+    face_ids: torch.Tensor,
+    barycentric_coords: torch.Tensor,
+) -> torch.Tensor:
+    body_vertices = as_cpu_tensor(body_vertices, torch.float32)
+    body_faces = as_cpu_tensor(body_faces, torch.int32)
+    face_ids = as_cpu_tensor(face_ids, torch.int32)
+    barycentric_coords = as_cpu_tensor(barycentric_coords, torch.float32)
+
+    triangles = body_vertices[body_faces.to(torch.long)[face_ids.to(torch.long)]]
+    return torch.sum(barycentric_coords[:, :, None] * triangles, dim=1)
+```
+
+All the `as_cpu_tensor` coercion are unnecessary, and should be omitted. 
 
 Use:
 - vertices as separate `(n, 3)` `float32` arrays,

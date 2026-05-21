@@ -22,22 +22,18 @@ def closest_points_on_mesh(
     body_faces: torch.Tensor,
 ) -> Binding:
     """Bind query points to their closest points on a triangle mesh."""
-    query_points = _as_cpu_tensor(query_points, torch.float32)
-    body_vertices = _as_cpu_tensor(body_vertices, torch.float32)
-    body_faces = _as_cpu_tensor(body_faces, torch.int32)
-
     distances_squared, face_ids, closest_points = igl.point_mesh_squared_distance(
         query_points.numpy().astype(np.float64, copy=False),
         body_vertices.numpy().astype(np.float64, copy=False),
         body_faces.numpy(),
     )
 
-    face_ids = torch.as_tensor(face_ids, dtype=torch.int32, device=torch.device("cpu"))
-    closest_points = torch.as_tensor(closest_points, dtype=torch.float32, device=torch.device("cpu"))
+    face_ids = torch.as_tensor(face_ids, dtype=torch.int32, device="cpu")
+    closest_points = torch.as_tensor(closest_points, dtype=torch.float32, device="cpu")
     distances_squared = torch.as_tensor(
         distances_squared,
         dtype=torch.float32,
-        device=torch.device("cpu"),
+        device="cpu",
     )
 
     triangles = body_vertices[body_faces.to(torch.long)[face_ids.to(torch.long)]]
@@ -51,12 +47,6 @@ def closest_points_on_mesh(
         distances_squared=distances_squared,
         normals=normals,
     )
-
-
-def _as_cpu_tensor(values: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
-    if isinstance(values, torch.Tensor):
-        return values.detach().to(device=torch.device("cpu"), dtype=dtype)
-    return torch.as_tensor(values, dtype=dtype, device=torch.device("cpu"))
 
 
 def _barycentric_coordinates(points: torch.Tensor, triangles: torch.Tensor) -> torch.Tensor:
