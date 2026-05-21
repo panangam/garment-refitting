@@ -131,9 +131,33 @@ def main() -> None:
     rebound_displacements.set_radius(0.03, relative=False)
 
     garment_translucent = True
+    auto_run_until_converged = False
+    show_max_iteration_warning = False
+
+    def update_relaxation_display(previous_vertices, relaxed_vertices) -> None:
+        shifted_previous_vertices_np = previous_vertices.numpy() + target_shift
+        shifted_relaxed_vertices_np = relaxed_vertices.numpy() + target_shift
+        warped_garment.update_vertex_positions(shifted_relaxed_vertices_np)
+
+        relaxation_segments = shifted_previous_vertices_np.repeat(2, axis=0)
+        relaxation_segments[1::2] = shifted_relaxed_vertices_np
+        relaxation_displacements.update_node_positions(relaxation_segments)
+        relaxation_displacements.set_enabled(True)
+
+    def update_rebinding_display(rebinding) -> None:
+        shifted_rebound_points_np = rebinding.target_binding.closest_points.numpy() + target_shift
+        shifted_rebound_candidates_np = rebinding.candidate_vertices.numpy() + target_shift
+        warped_garment.update_vertex_positions(shifted_rebound_candidates_np)
+        rebound_points.update_point_positions(shifted_rebound_points_np)
+        rebound_points.set_enabled(True)
+
+        rebound_segments = shifted_rebound_points_np.repeat(2, axis=0)
+        rebound_segments[1::2] = shifted_rebound_candidates_np
+        rebound_displacements.update_node_positions(rebound_segments)
+        rebound_displacements.set_enabled(True)
 
     def callback() -> None:
-        nonlocal garment_translucent
+        nonlocal garment_translucent, auto_run_until_converged, show_max_iteration_warning
         changed, garment_translucent = psim.Checkbox("translucent garments", garment_translucent)
         if changed:
             transparency = 0.45 if garment_translucent else 1.0
@@ -141,29 +165,26 @@ def main() -> None:
             warped_garment.set_transparency(transparency)
 
         if psim.Button("run one relaxation iteration"):
-            previous_vertices_np = manager.current_candidate_vertices.numpy() + target_shift
+            previous_vertices = manager.current_candidate_vertices
             relaxed_vertices = manager.run_relaxation_step()
-            shifted_relaxed_vertices_np = relaxed_vertices.numpy() + target_shift
-            warped_garment.update_vertex_positions(shifted_relaxed_vertices_np)
-
-            relaxation_segments = previous_vertices_np.repeat(2, axis=0)
-            relaxation_segments[1::2] = shifted_relaxed_vertices_np
-            relaxation_displacements.update_node_positions(relaxation_segments)
-            relaxation_displacements.set_enabled(True)
+            update_relaxation_display(previous_vertices, relaxed_vertices)
 
         if psim.Button("run rebinding"):
             rebinding = manager.run_rebinding_step()
-            shifted_rebound_points_np = rebinding.target_binding.closest_points.numpy() + target_shift
-            shifted_rebound_candidates_np = rebinding.candidate_vertices.numpy() + target_shift
+            update_rebinding_display(rebinding)
 
-            warped_garment.update_vertex_positions(shifted_rebound_candidates_np)
-            rebound_points.update_point_positions(shifted_rebound_points_np)
-            rebound_points.set_enabled(True)
+        if psim.Button("run until converged"):
+            auto_run_until_converged = True
+            show_max_iteration_warning = False
 
-            rebound_segments = shifted_rebound_points_np.repeat(2, axis=0)
-            rebound_segments[1::2] = shifted_rebound_candidates_np
-            rebound_displacements.update_node_positions(rebound_segments)
-            rebound_displacements.set_enabled(True)
+        if auto_run_until_converged and not manager.converged:
+            previous_vertices = manager.current_candidate_vertices
+            stats = manager.run_iteration()
+            update_relaxation_display(previous_vertices, manager.current_relaxed_vertices)
+            update_rebinding_display(manager.last_rebinding)
+            if manager.converged:
+                auto_run_until_converged = False
+                show_max_iteration_warning = not stats.converged
 
         if psim.Button("reset"):
             manager.reset()
@@ -171,6 +192,11 @@ def main() -> None:
             relaxation_displacements.set_enabled(False)
             rebound_points.set_enabled(False)
             rebound_displacements.set_enabled(False)
+            auto_run_until_converged = False
+            show_max_iteration_warning = False
+
+        if show_max_iteration_warning:
+            psim.TextColored((1.0, 0.3, 0.2, 1.0), "Warning: reached max iterations before convergence.")
 
     ps.set_user_callback(callback)
     ps.show()
