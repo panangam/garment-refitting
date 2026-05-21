@@ -18,6 +18,10 @@ Do not use fancy `__init__.py` files. Keep them empty, and use full path import.
 
 Do not add package dependencies by yourself. If a needed package is missing, tell me to manually add it.
 
+If an implementation decision or approximation affects the resulting algorithm, explicitly report it and bring it to my attention before or while implementing it. This includes choices such as snapping a barycentric surface point to a vertex, changing an optimization objective, replacing a specified geometric operation with an approximation, or silently changing where quantities are defined.
+
+In general, prefer allowing exceptions to propagate as opposed to catching it silently, unless told otherwise. 
+
 ## Assumptions
 
 This code is for internal research use with mostly valid data. Do not over-engineer robustness. Add lightweight assertions or checks where they clarify assumptions, but avoid large validation frameworks, defensive wrappers, input argument type coercion, or excessive error handling.
