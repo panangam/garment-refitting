@@ -5,7 +5,9 @@ import polyscope as ps
 import polyscope.imgui as psim
 
 from example_data import load_default_test_pair
+from refitting.affine_stencil import construct_affine_stencil_weights
 from refitting.initial_warp import compute_initial_warp
+from refitting.relaxation import assemble_relaxation_system, solve_relaxation
 
 
 def main() -> None:
@@ -84,6 +86,13 @@ def main() -> None:
         source_garment_faces_np,
         transparency=0.45,
     )
+    relaxed_garment = ps.register_surface_mesh(
+        "relaxed garment",
+        shifted_candidate_vertices_np,
+        source_garment_faces_np,
+        transparency=0.45,
+        enabled=False,
+    )
 
     source_closest_points = ps.register_point_cloud("source closest body points", source_closest_points_np)
     source_closest_points.set_radius(0.1, relative=False)
@@ -103,15 +112,54 @@ def main() -> None:
     displacements = ps.register_curve_network("reoriented displacements", segments, edges)
     displacements.set_radius(0.03, relative=False)
 
+    relaxed_segments = shifted_candidate_vertices_np.repeat(2, axis=0)
+    relaxed_edges = np.arange(candidate_vertices_np.shape[0] * 2, dtype=np.int32).reshape(-1, 2)
+    relaxation_displacements = ps.register_curve_network(
+        "relaxation displacements",
+        relaxed_segments,
+        relaxed_edges,
+        enabled=False,
+    )
+    relaxation_displacements.set_radius(0.03, relative=False)
+
     garment_translucent = True
+    relaxation_system = None
 
     def callback() -> None:
-        nonlocal garment_translucent
+        nonlocal garment_translucent, relaxation_system
         changed, garment_translucent = psim.Checkbox("translucent garments", garment_translucent)
         if changed:
             transparency = 0.45 if garment_translucent else 1.0
             source_garment.set_transparency(transparency)
             warped_garment.set_transparency(transparency)
+            relaxed_garment.set_transparency(transparency)
+
+        if psim.Button("run one relaxation iteration"):
+            if relaxation_system is None:
+                affine_weights = construct_affine_stencil_weights(
+                    source_garment_vertices,
+                    source_garment_faces,
+                    source_body_vertices,
+                    source_body_faces,
+                )
+                relaxation_system = assemble_relaxation_system(
+                    source_garment_vertices.shape[0],
+                    affine_weights,
+                    tightness_weight=1.0,
+                )
+
+            relaxed_vertices = solve_relaxation(
+                relaxation_system,
+                initial_warp.candidate_vertices,
+            )
+            shifted_relaxed_vertices_np = relaxed_vertices.numpy() + target_shift
+            relaxed_garment.update_vertex_positions(shifted_relaxed_vertices_np)
+            relaxed_garment.set_enabled(True)
+
+            relaxation_segments = shifted_candidate_vertices_np.repeat(2, axis=0)
+            relaxation_segments[1::2] = shifted_relaxed_vertices_np
+            relaxation_displacements.update_node_positions(relaxation_segments)
+            relaxation_displacements.set_enabled(True)
 
     ps.set_user_callback(callback)
     ps.show()
