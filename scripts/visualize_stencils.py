@@ -5,8 +5,8 @@ import polyscope as ps
 import torch
 
 from example_data import load_default_test_pair
+from refitting.affine_stencil import construct_garment_stencils
 from refitting.binding import closest_points_on_mesh
-from refitting.stencil import construct_garment_stencils
 
 
 def main() -> None:
