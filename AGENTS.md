@@ -14,6 +14,10 @@ Use helper functions only when:
 
 Do not create one-off helper functions just to shorten a local block of code. If a local block of code seems long, add comment to break it up, but only sparingly.
 
+Do not use fancy `__init__.py` files. Keep them empty, and use full path import. 
+
+Do not add package dependencies by yourself. If a needed package is missing, tell me to manually add it.
+
 ## Assumptions
 
 This code is for internal research use with mostly valid data. Do not over-engineer robustness. Add lightweight assertions or checks where they clarify assumptions, but avoid large validation frameworks, defensive wrappers, or excessive error handling.
@@ -21,11 +25,11 @@ This code is for internal research use with mostly valid data. Do not over-engin
 Use:
 - vertices as separate `(n, 3)` `float32` arrays,
 - faces as separate `(m, 3)` `int32` arrays,
-- NumPy arrays throughout the implementation,
-- SciPy sparse matrices/solvers for linear systems,
+- Pytorch arrays throughout the implementation, both dense and sparse,
 - libigl for closest-point queries,
 - potpourri3d for parallel transport when that step is implemented.
 - pytest for unit testing
+- cholespy for sparse cholesky solving
 
 ## Development process
 
