@@ -5,10 +5,7 @@ import polyscope as ps
 import polyscope.imgui as psim
 
 from example_data import load_default_test_pair
-from refitting.affine_stencil import construct_affine_stencil_weights
-from refitting.initial_warp import compute_initial_warp
-from refitting.rebinding import rebind_candidates_normal_aligned
-from refitting.relaxation import assemble_relaxation_system, solve_relaxation
+from refitting.manager import GarmentRefittingManager
 
 
 def main() -> None:
@@ -21,8 +18,9 @@ def main() -> None:
         target_body_faces,
     ) = load_default_test_pair()
 
-    initial_warp = compute_initial_warp(
+    manager = GarmentRefittingManager(
         source_garment_vertices,
+        source_garment_faces,
         source_body_vertices,
         source_body_faces,
         target_body_vertices,
@@ -35,9 +33,9 @@ def main() -> None:
     source_garment_faces_np = source_garment_faces.numpy()
     target_body_vertices_np = target_body_vertices.numpy()
     target_body_faces_np = target_body_faces.numpy()
-    source_closest_points_np = initial_warp.source_binding.closest_points.numpy()
-    target_anchor_points_np = initial_warp.target_anchor_points.numpy()
-    candidate_vertices_np = initial_warp.candidate_vertices.numpy()
+    source_closest_points_np = manager.initial_warp.source_binding.closest_points.numpy()
+    target_anchor_points_np = manager.initial_warp.target_anchor_points.numpy()
+    candidate_vertices_np = manager.current_candidate_vertices.numpy()
 
     source_points = np.vstack([source_body_vertices_np, source_garment_vertices_np])
     target_points = np.vstack([target_body_vertices_np, candidate_vertices_np])
@@ -133,12 +131,9 @@ def main() -> None:
     rebound_displacements.set_radius(0.03, relative=False)
 
     garment_translucent = True
-    relaxation_system = None
-    current_candidate_vertices = initial_warp.candidate_vertices
-    current_relaxed_vertices = None
 
     def callback() -> None:
-        nonlocal garment_translucent, relaxation_system, current_candidate_vertices, current_relaxed_vertices
+        nonlocal garment_translucent
         changed, garment_translucent = psim.Checkbox("translucent garments", garment_translucent)
         if changed:
             transparency = 0.45 if garment_translucent else 1.0
@@ -146,25 +141,9 @@ def main() -> None:
             warped_garment.set_transparency(transparency)
 
         if psim.Button("run one relaxation iteration"):
-            if relaxation_system is None:
-                affine_weights = construct_affine_stencil_weights(
-                    source_garment_vertices,
-                    source_garment_faces,
-                    source_body_vertices,
-                    source_body_faces,
-                )
-                relaxation_system = assemble_relaxation_system(
-                    source_garment_vertices.shape[0],
-                    affine_weights,
-                    tightness_weight=1.0,
-                )
-
-            previous_vertices_np = current_candidate_vertices.numpy() + target_shift
-            current_relaxed_vertices = solve_relaxation(
-                relaxation_system,
-                current_candidate_vertices,
-            )
-            shifted_relaxed_vertices_np = current_relaxed_vertices.numpy() + target_shift
+            previous_vertices_np = manager.current_candidate_vertices.numpy() + target_shift
+            relaxed_vertices = manager.run_relaxation_step()
+            shifted_relaxed_vertices_np = relaxed_vertices.numpy() + target_shift
             warped_garment.update_vertex_positions(shifted_relaxed_vertices_np)
 
             relaxation_segments = previous_vertices_np.repeat(2, axis=0)
@@ -172,15 +151,8 @@ def main() -> None:
             relaxation_displacements.update_node_positions(relaxation_segments)
             relaxation_displacements.set_enabled(True)
 
-        if psim.Button("run rebinding") and current_relaxed_vertices is not None:
-            rebinding = rebind_candidates_normal_aligned(
-                current_relaxed_vertices,
-                target_body_vertices,
-                target_body_faces,
-                initial_warp.source_binding.closest_points,
-                initial_warp.source_binding.normals,
-                source_garment_vertices,
-            )
+        if psim.Button("run rebinding"):
+            rebinding = manager.run_rebinding_step()
             shifted_rebound_points_np = rebinding.target_binding.closest_points.numpy() + target_shift
             shifted_rebound_candidates_np = rebinding.candidate_vertices.numpy() + target_shift
 
@@ -192,7 +164,6 @@ def main() -> None:
             rebound_segments[1::2] = shifted_rebound_candidates_np
             rebound_displacements.update_node_positions(rebound_segments)
             rebound_displacements.set_enabled(True)
-            current_candidate_vertices = rebinding.candidate_vertices
 
     ps.set_user_callback(callback)
     ps.show()
