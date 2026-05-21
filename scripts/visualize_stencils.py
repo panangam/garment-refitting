@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import numpy as np
 import polyscope as ps
+import torch
 
 from example_data import load_default_test_pair
-from refitting.barycentric import reconstruct_from_barycentric
 from refitting.binding import closest_points_on_mesh
+from refitting.stencil import construct_garment_stencils
 
 
 def main() -> None:
@@ -23,18 +24,20 @@ def main() -> None:
         source_body_vertices,
         source_body_faces,
     )
-    reconstructed_points = reconstruct_from_barycentric(
-        source_body_vertices,
-        source_body_faces,
-        binding.face_ids,
-        binding.barycentric_coords,
-    )
+    stencils = construct_garment_stencils(source_garment_faces, binding.face_ids)
+
+    stencil_sizes = torch.tensor([stencil.numel() for stencil in stencils], dtype=torch.int32)
+    sorted_by_size = torch.argsort(stencil_sizes)
+    selected_vertex_ids = [
+        int(sorted_by_size[0]),
+        int(sorted_by_size[len(sorted_by_size) // 2]),
+        int(sorted_by_size[-1]),
+    ]
 
     source_body_vertices_np = source_body_vertices.numpy()
     source_body_faces_np = source_body_faces.numpy()
     source_garment_vertices_np = source_garment_vertices.numpy()
     source_garment_faces_np = source_garment_faces.numpy()
-    reconstructed_points_np = reconstructed_points.numpy()
 
     scene_points = np.vstack([source_body_vertices_np, source_garment_vertices_np])
     bbox_low = scene_points.min(axis=0)
@@ -55,8 +58,21 @@ def main() -> None:
         source_garment_faces_np,
         transparency=0.45,
     )
-    points = ps.register_point_cloud("barycentric reconstruction", reconstructed_points_np)
-    points.set_radius(0.1, relative=False)
+
+    for vertex_id in selected_vertex_ids:
+        center = ps.register_point_cloud(
+            f"center {vertex_id}",
+            source_garment_vertices_np[vertex_id : vertex_id + 1],
+        )
+        center.set_radius(0.2, relative=False)
+
+        stencil_vertices = source_garment_vertices_np[stencils[vertex_id].to(torch.long).numpy()]
+        stencil_points = ps.register_point_cloud(
+            f"stencil {vertex_id} ({stencils[vertex_id].numel()} vertices)",
+            stencil_vertices,
+        )
+        stencil_points.set_radius(0.2, relative=False)
+
     ps.show()
 
 

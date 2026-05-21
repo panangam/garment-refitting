@@ -58,6 +58,8 @@ Implement one pipeline stage at a time and add small validation scripts or visua
 Use:
 - matplotlib for 2D plots,
 - Polyscope for 3D inspection.
+    - for pointcloud, use 0.1 radius (2 mm diameter) as the default
+    - for lines and curves, use 0.03 radius
 
 Keep integration tests until the end, after the individual stages are working.
 
