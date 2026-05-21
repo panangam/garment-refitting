@@ -105,6 +105,30 @@ def test_manager_run_until_converged_respects_max_iterations():
     assert manager.converged
 
 
+def test_manager_reset_restores_initial_warp_state_and_keeps_preprocessing():
+    """Checks reset clears iteration state while preserving cached preprocessing and solver."""
+    garment_vertices, garment_faces, body_vertices, body_faces = _garment_and_body_meshes()
+    manager = GarmentRefittingManager(
+        garment_vertices,
+        garment_faces,
+        body_vertices,
+        body_faces,
+        body_vertices,
+        body_faces,
+    )
+    solver = manager.relaxation_system.solver
+    manager.run_iteration()
+
+    manager.reset()
+
+    assert manager.relaxation_system.solver is solver
+    assert manager.current_relaxed_vertices is None
+    assert manager.last_rebinding is None
+    assert manager.history == []
+    assert not manager.converged
+    assert manager.current_candidate_vertices is manager.initial_warp.candidate_vertices
+
+
 def _garment_and_body_meshes():
     garment_vertices = torch.tensor(
         [

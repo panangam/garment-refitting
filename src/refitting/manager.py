@@ -72,6 +72,15 @@ class GarmentRefittingManager:
         bbox_points = torch.cat([source_body_vertices, target_body_vertices, garment_vertices], dim=0)
         bbox_size = torch.linalg.norm(torch.max(bbox_points, dim=0).values - torch.min(bbox_points, dim=0).values)
         self.tolerance = float(0.0001 * bbox_size) if tolerance is None else tolerance
+        self.reset()
+
+    def reset(self) -> None:
+        self.current_candidate_vertices = self.initial_warp.candidate_vertices
+        self.current_relaxed_vertices = None
+        self.last_relaxation_input_vertices = self.current_candidate_vertices
+        self.last_rebinding = None
+        self.history.clear()
+        self.converged = False
 
     def run_relaxation_step(self) -> torch.Tensor:
         self.last_relaxation_input_vertices = self.current_candidate_vertices

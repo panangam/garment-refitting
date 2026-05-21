@@ -165,6 +165,13 @@ def main() -> None:
             rebound_displacements.update_node_positions(rebound_segments)
             rebound_displacements.set_enabled(True)
 
+        if psim.Button("reset"):
+            manager.reset()
+            warped_garment.update_vertex_positions(shifted_candidate_vertices_np)
+            relaxation_displacements.set_enabled(False)
+            rebound_points.set_enabled(False)
+            rebound_displacements.set_enabled(False)
+
     ps.set_user_callback(callback)
     ps.show()
 
