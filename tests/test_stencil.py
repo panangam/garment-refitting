@@ -1,9 +1,10 @@
 import torch
 
-from refitting.stencil import construct_garment_stencils
+from refitting.affine_stencil import construct_garment_stencils
 
 
 def test_construct_garment_stencils_includes_all_face_adjacent_vertices_on_nonmanifold_mesh():
+    """Checks one-ring neighbors are collected from all incident faces without manifold assumptions."""
     garment_faces = torch.tensor(
         [
             [0, 1, 2],
@@ -25,6 +26,7 @@ def test_construct_garment_stencils_includes_all_face_adjacent_vertices_on_nonma
 
 
 def test_construct_garment_stencils_includes_vertices_sharing_closest_source_face():
+    """Checks fold-over augmentation adds vertices assigned to the same closest body face."""
     garment_faces = torch.tensor(
         [
             [0, 1, 2],
@@ -43,6 +45,7 @@ def test_construct_garment_stencils_includes_vertices_sharing_closest_source_fac
 
 
 def test_construct_garment_stencils_removes_center_and_uses_deterministic_order():
+    """Verifies each stencil excludes its center vertex and returns sorted deterministic indices."""
     garment_faces = torch.tensor(
         [
             [2, 0, 1],

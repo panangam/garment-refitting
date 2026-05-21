@@ -4,6 +4,7 @@ from refitting.binding import closest_points_on_mesh
 
 
 def test_closest_points_on_mesh_binding_shapes_and_dtypes():
+    """Checks Step 1 binding returns all expected fields with CPU tensor shapes and dtypes."""
     body_vertices, body_faces = _square_mesh()
     query_points = torch.tensor(
         [
@@ -30,6 +31,7 @@ def test_closest_points_on_mesh_binding_shapes_and_dtypes():
 
 
 def test_closest_points_on_mesh_binding_reconstructs_closest_points():
+    """Verifies barycentric coordinates and face IDs reconstruct the returned closest points."""
     body_vertices, body_faces = _square_mesh()
     query_points = torch.tensor(
         [
@@ -57,6 +59,7 @@ def test_closest_points_on_mesh_binding_reconstructs_closest_points():
 
 
 def test_closest_points_on_mesh_binding_normals_are_finite_unit_vectors():
+    """Checks closest-triangle normals are finite unit vectors with the expected orientation."""
     body_vertices, body_faces = _square_mesh()
     query_points = torch.tensor(
         [

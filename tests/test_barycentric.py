@@ -5,6 +5,7 @@ from refitting.binding import closest_points_on_mesh
 
 
 def test_reconstruct_from_barycentric_known_triangle_points():
+    """Checks reconstruction on one triangle for corners, edge midpoints, and centroid."""
     body_vertices = torch.tensor(
         [
             [0.0, 0.0, 0.0],
@@ -44,6 +45,7 @@ def test_reconstruct_from_barycentric_known_triangle_points():
 
 
 def test_reconstruct_from_barycentric_reproduces_closest_point_binding():
+    """Verifies Step 2 reconstructs the closest points produced by the Step 1 binding helper."""
     body_vertices, body_faces = _square_mesh()
     query_points = torch.tensor(
         [
