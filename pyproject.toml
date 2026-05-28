@@ -16,7 +16,6 @@ dependencies = [
 
 [build-system]
 requires = [
-    "libigl>=2.6.2",
     "nanobind>=2.12.0",
     "scikit-build-core>=0.12.2",
 ]

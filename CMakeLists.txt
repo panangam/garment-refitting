@@ -9,16 +9,15 @@ find_package(nanobind CONFIG REQUIRED)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/geometry-central/cmake")
 
-execute_process(
-  COMMAND
-    "${Python_EXECUTABLE}" -c
-    "from pathlib import Path; import site, sysconfig; paths = [sysconfig.get_path('purelib'), sysconfig.get_path('platlib'), *site.getsitepackages()]; candidates = [Path(p) / 'include' for p in paths if p]; print(next((str(p) for p in candidates if (p / 'Eigen/Core').exists()), ''), end='')"
-  OUTPUT_VARIABLE REFITTING_EIGEN_INCLUDE
-)
-if(REFITTING_EIGEN_INCLUDE)
-  add_library(refitting_eigen INTERFACE)
-  add_library(Eigen3::Eigen ALIAS refitting_eigen)
-  target_include_directories(refitting_eigen SYSTEM INTERFACE "${REFITTING_EIGEN_INCLUDE}")
+set(REFITTING_EIGEN_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/external/eigen")
+if(NOT EXISTS "${REFITTING_EIGEN_INCLUDE}/Eigen/Core")
+  message(FATAL_ERROR "Eigen headers were not found at ${REFITTING_EIGEN_INCLUDE}")
+endif()
+add_library(refitting_eigen INTERFACE)
+add_library(Eigen3::Eigen ALIAS refitting_eigen)
+target_include_directories(refitting_eigen SYSTEM INTERFACE "${REFITTING_EIGEN_INCLUDE}")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  target_compile_options(refitting_eigen INTERFACE -Wno-template-body)
 endif()
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
