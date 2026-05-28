@@ -86,6 +86,35 @@ def test_manager_can_run_normal_aligned_rebinding_step():
     assert bool(torch.isfinite(rebinding.candidate_vertices).all())
 
 
+def test_manager_rebinding_is_idempotent_without_new_relaxation():
+    """Checks repeated rebinding reuses the latest relaxed garment without advancing."""
+    garment_vertices, garment_faces, body_vertices, body_faces = _garment_and_body_meshes()
+    target_body_vertices = body_vertices.clone()
+    target_body_vertices[:, 0] += 0.25
+    manager = GarmentRefittingManager(
+        garment_vertices,
+        garment_faces,
+        body_vertices,
+        body_faces,
+        target_body_vertices,
+        body_faces,
+    )
+
+    manager.run_relaxation_step()
+    first_rebinding = manager.run_rebinding_step()
+    relaxed_vertices = manager.current_relaxed_vertices
+
+    second_rebinding = manager.run_rebinding_step()
+
+    assert manager.current_relaxed_vertices is relaxed_vertices
+    torch.testing.assert_close(
+        second_rebinding.candidate_vertices,
+        first_rebinding.candidate_vertices,
+        atol=1e-6,
+        rtol=0.0,
+    )
+
+
 def test_manager_change_target_body_recomputes_initial_warp_and_keeps_solver():
     """Checks target-only swaps avoid rebuilding the garment relaxation system."""
     garment_vertices, garment_faces, body_vertices, body_faces = _garment_and_body_meshes()

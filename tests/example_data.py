@@ -9,7 +9,7 @@ import torch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BODY_SCALE_TO_CM = 100.0
-DEFAULT_SOURCE_SET_ID = "rand_2CU0AIB2VI"
+DEFAULT_SOURCE_SET_ID = "rand_1HX9UGCJ83"
 DEFAULT_TARGET_SET_ID = "rand_0YN1FIW5GU"
 
 

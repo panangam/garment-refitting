@@ -9,8 +9,8 @@ import torch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BODY_SCALE_TO_CM = 100.0
-DEFAULT_SOURCE_SET_ID = "rand_0AAY3NQH8J"
-DEFAULT_TARGET_SET_ID = "rand_1HX9UGCJ83"
+DEFAULT_SOURCE_SET_ID = "rand_1HX9UGCJ83"
+DEFAULT_TARGET_SET_ID = "rand_LDRM8LXNCX"
 
 
 def load_triangle_mesh(path: Path, scale: float = 1.0) -> tuple[torch.Tensor, torch.Tensor]:

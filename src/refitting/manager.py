@@ -77,7 +77,6 @@ class GarmentRefittingManager:
 
         self.current_candidate_vertices = self.initial_warp.candidate_vertices
         self.current_relaxed_vertices: torch.Tensor | None = None
-        self.last_relaxation_input_vertices = self.current_candidate_vertices
         self.last_rebinding: Rebinding | None = None
         self.history: list[IterationStats] = []
         self.converged = False
@@ -120,13 +119,11 @@ class GarmentRefittingManager:
     def reset(self) -> None:
         self.current_candidate_vertices = self.initial_warp.candidate_vertices
         self.current_relaxed_vertices = None
-        self.last_relaxation_input_vertices = self.current_candidate_vertices
         self.last_rebinding = None
         self.history.clear()
         self.converged = False
 
     def run_relaxation_step(self) -> torch.Tensor:
-        self.last_relaxation_input_vertices = self.current_candidate_vertices
         self.current_relaxed_vertices = solve_relaxation(
             self.relaxation_system,
             self.current_candidate_vertices,
@@ -134,12 +131,15 @@ class GarmentRefittingManager:
         return self.current_relaxed_vertices
 
     def run_rebinding_step(self) -> Rebinding:
-        if self.current_relaxed_vertices is None:
-            self.run_relaxation_step()
+        relaxed_vertices = (
+            self.current_candidate_vertices
+            if self.current_relaxed_vertices is None
+            else self.current_relaxed_vertices
+        )
 
         if self.rebinding_method == "normal_aligned":
             self.last_rebinding = rebind_candidates_normal_aligned(
-                self.current_relaxed_vertices,
+                relaxed_vertices,
                 self.target_body_vertices,
                 self.target_body_faces,
                 self.initial_warp.source_binding.closest_points,
@@ -148,7 +148,7 @@ class GarmentRefittingManager:
             )
         else:
             self.last_rebinding = rebind_candidates_directional_field(
-                self.current_relaxed_vertices,
+                relaxed_vertices,
                 self.target_body_vertices,
                 self.target_body_faces,
                 self.initial_warp.source_binding.face_ids,
