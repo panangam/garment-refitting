@@ -8,7 +8,7 @@ import numpy as np
 import polyscope as ps
 import torch
 
-from refitting.geometry_central import compute_curvature_aligned_face_direction_field, compute_face_tangent_basis
+from refitting.geometry_central import compute_face_tangent_basis, compute_smoothest_face_direction_field
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -75,7 +75,7 @@ def direction_field_arrows(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=Path, default=PROJECT_ROOT / "data")
-    parser.add_argument("--n-sym", type=int, default=4, choices=(2, 4))
+    parser.add_argument("--n-sym", type=int, default=1)
     parser.add_argument("--body-scale", type=float, default=BODY_SCALE_TO_CM)
     parser.add_argument("--arrow-length", type=float, default=None)
     parser.add_argument("--arrow-length-fraction", type=float, default=DEFAULT_ARROW_LENGTH_FRACTION)
@@ -94,7 +94,7 @@ def main() -> None:
 
     for path in mesh_paths:
         vertices, faces = load_obj_mesh(path, scale=args.body_scale)
-        field = compute_curvature_aligned_face_direction_field(vertices, faces, args.n_sym)
+        field = compute_smoothest_face_direction_field(vertices, faces, args.n_sym)
         face_tangent_basis = compute_face_tangent_basis(vertices, faces)
 
         vertices_np = vertices.numpy()

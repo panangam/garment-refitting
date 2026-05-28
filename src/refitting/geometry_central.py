@@ -22,6 +22,23 @@ def compute_curvature_aligned_face_direction_field(
     )
 
 
+def compute_smoothest_face_direction_field(
+    vertices: torch.Tensor,
+    faces: torch.Tensor,
+    n_sym: int = 1,
+) -> torch.Tensor:
+    """Compute geometry-central's smoothest face direction field.
+
+    The returned tensor has shape ``(num_faces, 2)``. For ``n_sym == 1``, this
+    is a signed face-local direction field.
+    """
+    return _geometry_central.compute_smoothest_face_direction_field(
+        vertices.contiguous(),
+        faces.contiguous(),
+        n_sym,
+    )
+
+
 def compute_face_tangent_basis(
     vertices: torch.Tensor,
     faces: torch.Tensor,

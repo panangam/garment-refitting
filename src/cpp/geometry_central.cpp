@@ -78,6 +78,36 @@ FieldTensor compute_curvature_aligned_face_direction_field(
   return FieldTensor(output, {n_faces, size_t(2)}, owner);
 }
 
+FieldTensor compute_smoothest_face_direction_field(
+    VerticesTensor vertices,
+    FacesTensor faces,
+    int n_sym = 1
+) {
+  if (n_sym < 1) {
+    throw std::logic_error("n_sym must be positive");
+  }
+
+  const size_t n_faces = faces.shape(0);
+  std::unique_ptr<geometrycentral::surface::ManifoldSurfaceMesh> mesh;
+  std::unique_ptr<geometrycentral::surface::VertexPositionGeometry> geometry;
+  std::tie(mesh, geometry) = make_geometry(vertices, faces);
+
+  geometrycentral::surface::FaceData<geometrycentral::Vector2> field =
+      geometrycentral::surface::computeSmoothestFaceDirectionField(*geometry, n_sym);
+
+  float* output = new float[n_faces * 2];
+  for (size_t i = 0; i < n_faces; ++i) {
+    const geometrycentral::Vector2 direction = field[mesh->face(i)];
+    output[2 * i] = static_cast<float>(direction.x);
+    output[2 * i + 1] = static_cast<float>(direction.y);
+  }
+
+  nb::capsule owner(output, [](void* data) noexcept {
+    delete[] static_cast<float*>(data);
+  });
+  return FieldTensor(output, {n_faces, size_t(2)}, owner);
+}
+
 FaceTangentBasisTensor compute_face_tangent_basis(VerticesTensor vertices, FacesTensor faces) {
   const size_t n_faces = faces.shape(0);
   std::unique_ptr<geometrycentral::surface::ManifoldSurfaceMesh> mesh;
@@ -111,6 +141,14 @@ NB_MODULE(_geometry_central, module) {
       nb::arg("faces"),
       nb::arg("n_sym") = 2,
       "Compute geometry-central's curvature-aligned face direction field."
+  );
+  module.def(
+      "compute_smoothest_face_direction_field",
+      &compute_smoothest_face_direction_field,
+      nb::arg("vertices"),
+      nb::arg("faces"),
+      nb::arg("n_sym") = 1,
+      "Compute geometry-central's smoothest face direction field."
   );
   module.def(
       "compute_face_tangent_basis",
