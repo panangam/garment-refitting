@@ -1,7 +1,13 @@
 # Garment Refitting
 
+This repository is a research implementation of garment refitting for body shape transfer, following de Goes, Fong, and O'Malley, ["Garment Refitting for Digital Characters"](https://research.pixar.com/#pub-2020-siggraphtalks-gfo) (SIGGRAPH Talks 2020). The pipeline alternates an affine-coordinate relaxation step with a rebinding step that preserves source garment spacing relative to a target body.
+
+## Implementation
+
+The implementation uses PyTorch tensors as the main in-memory data format for vertices, faces, sparse matrices, and intermediate geometry. Mesh closest-point queries and mass matrices use libigl, relaxation is solved with a prefactored sparse Cholesky system, and a narrow C++/nanobind binding to geometry-central provides the smooth face direction field and face tangent frames used by directional-field rebinding.
+
 ## Data Format
 
-Example data lives under `data/<sample_id>/`. Each sample includes a body mesh as an `*_apart.obj` file and a simulated source garment as an `*_sim.ply` file.
+Example data, taken from GarmentCodeData, lives under `data/<sample_id>/`. Each sample includes a body mesh as an `*_apart.obj` file and a simulated source garment as an `*_sim.ply` file.
 
 The current default test pair uses `data/rand_2CU0AIB2VI/01258_apart.obj` with `data/rand_2CU0AIB2VI/rand_2CU0AIB2VI_sim.ply` as the source, and `data/rand_0YN1FIW5GU/04737_apart.obj` as the target body. The body meshes share face connectivity. Body OBJs are loaded in meters and scaled by `100.0` into centimeters; garment PLYs are already treated as centimeters and are not rescaled.
