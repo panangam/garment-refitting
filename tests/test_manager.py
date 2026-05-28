@@ -1,3 +1,5 @@
+import igl
+import numpy as np
 import torch
 
 from refitting.manager import GarmentRefittingManager
@@ -142,6 +144,56 @@ def test_manager_change_target_body_recomputes_initial_warp_and_keeps_solver():
     assert manager.target_body_vertices is target_body_vertices
     assert manager.target_face_frame_field.frames.shape == (body_faces.shape[0], 3, 3)
     assert not torch.allclose(manager.current_candidate_vertices, old_candidate_vertices)
+
+
+def test_manager_change_tightness_weight_rebuilds_solver_and_keeps_geometry_preprocessing():
+    """Checks tightness changes only rebuild the relaxation system and reset iteration state."""
+    garment_vertices, garment_faces, body_vertices, body_faces = _garment_and_body_meshes()
+    manager = GarmentRefittingManager(
+        garment_vertices,
+        garment_faces,
+        body_vertices,
+        body_faces,
+        body_vertices,
+        body_faces,
+    )
+    affine_weights = manager.affine_weights
+    initial_warp = manager.initial_warp
+    old_solver = manager.relaxation_system.solver
+    manager.run_iteration()
+
+    manager.change_tightness_weight(3.0)
+
+    assert manager.tightness_weight == 3.0
+    assert manager.affine_weights is affine_weights
+    assert manager.initial_warp is initial_warp
+    assert manager.relaxation_system.solver is not old_solver
+    assert manager.current_relaxed_vertices is None
+    assert manager.last_rebinding is None
+    assert manager.history == []
+
+
+def test_manager_uses_libigl_massmatrix_for_garment_vertex_areas():
+    """Checks the tightness vertex areas come from libigl's mass matrix diagonal."""
+    garment_vertices, garment_faces, body_vertices, body_faces = _garment_and_body_meshes()
+    manager = GarmentRefittingManager(
+        garment_vertices,
+        garment_faces,
+        body_vertices,
+        body_faces,
+        body_vertices,
+        body_faces,
+    )
+    mass_matrix = igl.massmatrix(
+        garment_vertices.numpy().astype(np.float64, copy=False),
+        garment_faces.numpy().astype(np.int64, copy=False),
+        igl.MASSMATRIX_TYPE_VORONOI,
+    )
+
+    torch.testing.assert_close(
+        manager.garment_vertex_areas,
+        torch.as_tensor(mass_matrix.diagonal(), dtype=torch.float32),
+    )
 
 
 def test_manager_run_iteration_records_finite_history():

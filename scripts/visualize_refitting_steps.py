@@ -30,6 +30,7 @@ def main() -> None:
     rebound_points = None
     rebound_displacements = None
 
+    tightness_weight = manager.tightness_weight
     garment_translucent = True
     auto_run_until_converged = False
     show_max_iteration_warning = False
@@ -172,7 +173,7 @@ def main() -> None:
         rebound_displacements.set_enabled(True)
 
     def callback() -> None:
-        nonlocal auto_run_until_converged, garment_translucent, manager, rebinding_method_index
+        nonlocal auto_run_until_converged, garment_translucent, manager, rebinding_method_index, tightness_weight
         nonlocal show_max_iteration_warning, source_set_index, target_set_index
 
         changed, source_set_index = psim.Combo("source set", source_set_index, set_ids)
@@ -181,6 +182,7 @@ def main() -> None:
                 set_ids[source_set_index],
                 set_ids[target_set_index],
                 REBINDING_METHODS[rebinding_method_index],
+                tightness_weight,
             )
             register_scene()
             auto_run_until_converged = False
@@ -208,6 +210,20 @@ def main() -> None:
         if changed:
             manager.rebinding_method = REBINDING_METHODS[rebinding_method_index]
             auto_run_until_converged = False
+
+        changed, tightness_weight = psim.InputFloat(
+            "tightness weight",
+            tightness_weight,
+            step=0.1,
+            step_fast=1.0,
+            format="%.4f",
+        )
+        tightness_weight = max(tightness_weight, 1e-8)
+        if changed:
+            manager.change_tightness_weight(tightness_weight)
+            register_scene()
+            auto_run_until_converged = False
+            show_max_iteration_warning = False
 
         if psim.Button("run one relaxation iteration"):
             previous_vertices = manager.current_candidate_vertices
@@ -256,6 +272,7 @@ def build_manager(
     source_set_id: str,
     target_set_id: str,
     rebinding_method: str,
+    tightness_weight: float = 1.0,
 ) -> GarmentRefittingManager:
     source_body_vertices, source_body_faces, source_garment_vertices, source_garment_faces = load_mesh_set(source_set_id)
     target_body_vertices, target_body_faces, _, _ = load_mesh_set(target_set_id)
@@ -266,6 +283,7 @@ def build_manager(
         source_body_faces,
         target_body_vertices,
         target_body_faces,
+        tightness_weight=tightness_weight,
         rebinding_method=rebinding_method,
     )
 

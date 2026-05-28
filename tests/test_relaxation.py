@@ -2,7 +2,11 @@ import torch
 
 from refitting.affine_stencil import AffineStencilWeights
 from refitting.affine_stencil import construct_affine_stencil_weights
-from refitting.relaxation import assemble_relaxation_system, construct_stencil_matrix, solve_relaxation
+from refitting.relaxation import (
+    assemble_relaxation_system,
+    construct_stencil_matrix,
+    solve_relaxation,
+)
 
 
 def test_construct_stencil_matrix_extracts_edge_vectors():
@@ -40,6 +44,38 @@ def test_assemble_relaxation_system_shape_symmetry_and_positive_definite_quadrat
         torch.manual_seed(seed)
         y = torch.randn(4, dtype=torch.float32)
         assert float(y @ dense_matrix @ y) > 0.0
+
+
+def test_assemble_relaxation_system_uses_vertex_area_tightness_weights():
+    """Verifies M uses area-weighted tightness on both the matrix and RHS."""
+    affine_weights = AffineStencilWeights(stencils=[], weights=[])
+    vertex_areas = torch.tensor([0.5, 2.0, 3.0], dtype=torch.float32)
+    candidate_vertices = torch.tensor(
+        [
+            [1.0, 2.0, 3.0],
+            [4.0, 5.0, 6.0],
+            [7.0, 8.0, 9.0],
+        ],
+        dtype=torch.float32,
+    )
+
+    system = assemble_relaxation_system(
+        3,
+        affine_weights,
+        tightness_weight=4.0,
+        vertex_areas=vertex_areas,
+        include_stencil_term=False,
+    )
+    relaxed = solve_relaxation(system, candidate_vertices)
+
+    torch.testing.assert_close(system.tightness_weights, 4.0 * vertex_areas)
+    torch.testing.assert_close(
+        system.matrix.to_dense(),
+        torch.diag(4.0 * vertex_areas),
+        atol=1e-6,
+        rtol=0.0,
+    )
+    torch.testing.assert_close(relaxed, candidate_vertices, atol=1e-6, rtol=0.0)
 
 
 def test_solve_relaxation_with_stencil_term_disabled_returns_candidates():

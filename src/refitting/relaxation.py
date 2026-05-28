@@ -12,7 +12,7 @@ from refitting.affine_stencil import AffineStencilWeights
 class RelaxationSystem:
     matrix: torch.Tensor
     solver: cholespy.CholeskySolverF
-    tightness_weight: float
+    tightness_weights: torch.Tensor
 
 
 def construct_stencil_matrix(
@@ -47,8 +47,14 @@ def assemble_relaxation_system(
     num_vertices: int,
     affine_weights: AffineStencilWeights,
     tightness_weight: float = 1.0,
+    vertex_areas: torch.Tensor | None = None,
     include_stencil_term: bool = True,
 ) -> RelaxationSystem:
+    if vertex_areas is None:
+        tightness_weights = torch.full((num_vertices,), tightness_weight, dtype=torch.float32)
+    else:
+        tightness_weights = tightness_weight * vertex_areas
+
     row_indices: list[int] = []
     col_indices: list[int] = []
     values: list[float] = []
@@ -84,7 +90,7 @@ def assemble_relaxation_system(
     for vertex_id in range(num_vertices):
         row_indices.append(vertex_id)
         col_indices.append(vertex_id)
-        values.append(tightness_weight)
+        values.append(float(tightness_weights[vertex_id]))
 
     indices = torch.tensor([row_indices, col_indices], dtype=torch.int64)
     matrix = torch.sparse_coo_tensor(
@@ -94,14 +100,14 @@ def assemble_relaxation_system(
         check_invariants=False,
     ).coalesce()
     solver = _factorize_relaxation_matrix(matrix)
-    return RelaxationSystem(matrix=matrix, solver=solver, tightness_weight=tightness_weight)
+    return RelaxationSystem(matrix=matrix, solver=solver, tightness_weights=tightness_weights)
 
 
 def solve_relaxation(
     system: RelaxationSystem,
     candidate_vertices: torch.Tensor,
 ) -> torch.Tensor:
-    right_hand_side = system.tightness_weight * candidate_vertices
+    right_hand_side = system.tightness_weights[:, None] * candidate_vertices
     solution = torch.empty_like(right_hand_side)
     system.solver.solve(right_hand_side, solution)
     return solution

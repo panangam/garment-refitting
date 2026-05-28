@@ -2,13 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import igl
+import numpy as np
 import torch
 
 from refitting.affine_stencil import AffineStencilWeights, construct_affine_stencil_weights
 from refitting.directional_field import compute_face_frame_field
 from refitting.initial_warp import InitialWarp, compute_initial_warp
 from refitting.rebinding import Rebinding, rebind_candidates_directional_field, rebind_candidates_normal_aligned
-from refitting.relaxation import RelaxationSystem, assemble_relaxation_system, solve_relaxation
+from refitting.relaxation import (
+    RelaxationSystem,
+    assemble_relaxation_system,
+    solve_relaxation,
+)
 
 
 @dataclass(frozen=True)
@@ -69,10 +75,20 @@ class GarmentRefittingManager:
             source_body_vertices,
             source_body_faces,
         )
+        garment_mass_matrix = igl.massmatrix(
+            garment_vertices.numpy().astype(np.float64, copy=False),
+            garment_faces.numpy().astype(np.int64, copy=False),
+            igl.MASSMATRIX_TYPE_VORONOI,
+        )
+        self.garment_vertex_areas = torch.as_tensor(
+            garment_mass_matrix.diagonal(),
+            dtype=torch.float32,
+        )
         self.relaxation_system = assemble_relaxation_system(
             garment_vertices.shape[0],
             self.affine_weights,
             tightness_weight=tightness_weight,
+            vertex_areas=self.garment_vertex_areas,
         )
 
         self.current_candidate_vertices = self.initial_warp.candidate_vertices
@@ -106,6 +122,16 @@ class GarmentRefittingManager:
         )
         if self._automatic_tolerance:
             self._update_tolerance(None)
+        self.reset()
+
+    def change_tightness_weight(self, tightness_weight: float) -> None:
+        self.tightness_weight = tightness_weight
+        self.relaxation_system = assemble_relaxation_system(
+            self.garment_vertices.shape[0],
+            self.affine_weights,
+            tightness_weight=tightness_weight,
+            vertex_areas=self.garment_vertex_areas,
+        )
         self.reset()
 
     def _update_tolerance(self, tolerance: float | None) -> None:
