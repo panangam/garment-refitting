@@ -1,0 +1,3 @@
+[submodule "external/geometry-central"]
+	path = external/geometry-central
+	url = https://github.com/nmwsharp/geometry-central.git
