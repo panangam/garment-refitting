@@ -20,9 +20,9 @@ class TestMeshPair:
 
 
 DEFAULT_TEST_PAIR = TestMeshPair(
-    source_body_path=PROJECT_ROOT / "data/rand_ZQFHURJ27G/02540_apart.obj",
-    source_garment_path=PROJECT_ROOT / "data/rand_ZQFHURJ27G/rand_ZQFHURJ27G_sim.ply",
-    target_body_path=PROJECT_ROOT / "data/rand_0YN1FIW5GU/04737_apart.obj",
+    source_body_path=PROJECT_ROOT / "data/rand_0AAY3NQH8J/00564_apart.obj",
+    source_garment_path=PROJECT_ROOT / "data/rand_0AAY3NQH8J/rand_0AAY3NQH8J_sim.ply",
+    target_body_path=PROJECT_ROOT / "data/rand_1HX9UGCJ83/04344_apart.obj",
 )
 
 
