@@ -226,7 +226,15 @@ def main() -> None:
             previous_vertices = manager.current_candidate_vertices
             stats = manager.run_iteration()
             update_relaxation_display(previous_vertices, manager.current_relaxed_vertices)
-            update_rebinding_display(manager.last_rebinding)
+            shifted_rebound_points_np = manager.last_rebinding.target_binding.closest_points.numpy() + target_shift
+            shifted_rebound_candidates_np = manager.last_rebinding.candidate_vertices.numpy() + target_shift
+            rebound_points.update_point_positions(shifted_rebound_points_np)
+            rebound_points.set_enabled(True)
+
+            rebound_segments = shifted_rebound_points_np.repeat(2, axis=0)
+            rebound_segments[1::2] = shifted_rebound_candidates_np
+            rebound_displacements.update_node_positions(rebound_segments)
+            rebound_displacements.set_enabled(True)
             if manager.converged:
                 auto_run_until_converged = False
                 show_max_iteration_warning = not stats.converged
