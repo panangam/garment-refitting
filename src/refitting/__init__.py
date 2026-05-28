@@ -1,0 +1,1 @@
+from refitting.manager import GarmentRefittingManager

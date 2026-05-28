@@ -5,7 +5,7 @@ import polyscope as ps
 import polyscope.imgui as psim
 
 from example_data import DEFAULT_SOURCE_SET_ID, DEFAULT_TARGET_SET_ID, list_mesh_set_ids, load_mesh_set
-from refitting.manager import GarmentRefittingManager
+from refitting import GarmentRefittingManager
 
 
 REBINDING_METHODS = ["directional_field", "normal_aligned"]

@@ -3,7 +3,7 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 
 from example_data import load_default_test_pair
-from refitting.manager import GarmentRefittingManager
+from refitting import GarmentRefittingManager
 
 
 def main() -> None:
