@@ -8,6 +8,9 @@ from example_data import load_default_test_pair
 from refitting.manager import GarmentRefittingManager
 
 
+REBINDING_METHODS = ["directional_field", "normal_aligned"]
+
+
 def main() -> None:
     (
         source_body_vertices,
@@ -25,6 +28,7 @@ def main() -> None:
         source_body_faces,
         target_body_vertices,
         target_body_faces,
+        rebinding_method="directional_field",
     )
 
     source_body_vertices_np = source_body_vertices.numpy()
@@ -133,6 +137,7 @@ def main() -> None:
     garment_translucent = True
     auto_run_until_converged = False
     show_max_iteration_warning = False
+    rebinding_method_index = REBINDING_METHODS.index(manager.rebinding_method)
 
     def update_relaxation_display(previous_vertices, relaxed_vertices) -> None:
         shifted_previous_vertices_np = previous_vertices.numpy() + target_shift
@@ -157,12 +162,21 @@ def main() -> None:
         rebound_displacements.set_enabled(True)
 
     def callback() -> None:
-        nonlocal garment_translucent, auto_run_until_converged, show_max_iteration_warning
+        nonlocal garment_translucent, auto_run_until_converged, rebinding_method_index, show_max_iteration_warning
         changed, garment_translucent = psim.Checkbox("translucent garments", garment_translucent)
         if changed:
             transparency = 0.45 if garment_translucent else 1.0
             source_garment.set_transparency(transparency)
             warped_garment.set_transparency(transparency)
+
+        changed, rebinding_method_index = psim.Combo(
+            "rebinding method",
+            rebinding_method_index,
+            REBINDING_METHODS,
+        )
+        if changed:
+            manager.rebinding_method = REBINDING_METHODS[rebinding_method_index]
+            auto_run_until_converged = False
 
         if psim.Button("run one relaxation iteration"):
             previous_vertices = manager.current_candidate_vertices
