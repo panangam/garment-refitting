@@ -4,7 +4,7 @@ import numpy as np
 import polyscope as ps
 import polyscope.imgui as psim
 
-from example_data import load_default_test_pair
+from example_data import DEFAULT_SOURCE_SET_ID, DEFAULT_TARGET_SET_ID, list_mesh_set_ids, load_mesh_set
 from refitting.manager import GarmentRefittingManager
 
 
@@ -12,132 +12,142 @@ REBINDING_METHODS = ["directional_field", "normal_aligned"]
 
 
 def main() -> None:
-    (
-        source_body_vertices,
-        source_body_faces,
-        source_garment_vertices,
-        source_garment_faces,
-        target_body_vertices,
-        target_body_faces,
-    ) = load_default_test_pair()
+    set_ids = list_mesh_set_ids()
+    source_set_index = set_ids.index(DEFAULT_SOURCE_SET_ID)
+    target_set_index = set_ids.index(DEFAULT_TARGET_SET_ID)
+    rebinding_method_index = 0
 
-    manager = GarmentRefittingManager(
-        source_garment_vertices,
-        source_garment_faces,
-        source_body_vertices,
-        source_body_faces,
-        target_body_vertices,
-        target_body_faces,
-        rebinding_method="directional_field",
+    manager = build_manager(
+        set_ids[source_set_index],
+        set_ids[target_set_index],
+        REBINDING_METHODS[rebinding_method_index],
     )
 
-    source_body_vertices_np = source_body_vertices.numpy()
-    source_body_faces_np = source_body_faces.numpy()
-    source_garment_vertices_np = source_garment_vertices.numpy()
-    source_garment_faces_np = source_garment_faces.numpy()
-    target_body_vertices_np = target_body_vertices.numpy()
-    target_body_faces_np = target_body_faces.numpy()
-    source_closest_points_np = manager.initial_warp.source_binding.closest_points.numpy()
-    target_anchor_points_np = manager.initial_warp.target_anchor_points.numpy()
-    candidate_vertices_np = manager.current_candidate_vertices.numpy()
+    target_shift = np.zeros(3, dtype=np.float32)
+    source_garment = None
+    warped_garment = None
+    relaxation_displacements = None
+    rebound_points = None
+    rebound_displacements = None
 
-    source_points = np.vstack([source_body_vertices_np, source_garment_vertices_np])
-    target_points = np.vstack([target_body_vertices_np, candidate_vertices_np])
-    source_width = source_points[:, 0].max() - source_points[:, 0].min()
-    target_width = target_points[:, 0].max() - target_points[:, 0].min()
-    x_offset = source_width + 10.0
-    target_shift = np.array([x_offset, 0.0, 0.0], dtype=np.float32)
-
-    shifted_target_body_vertices_np = target_body_vertices_np + target_shift
-    shifted_target_anchor_points_np = target_anchor_points_np + target_shift
-    shifted_candidate_vertices_np = candidate_vertices_np + target_shift
-
-    scene_points = np.vstack(
-        [
-            source_body_vertices_np,
-            source_garment_vertices_np,
-            shifted_target_body_vertices_np,
-            shifted_candidate_vertices_np,
-        ]
-    )
-    bbox_low = scene_points.min(axis=0)
-    bbox_high = scene_points.max(axis=0)
-    length_scale = np.linalg.norm(bbox_high - bbox_low)
+    garment_translucent = True
+    auto_run_until_converged = False
+    show_max_iteration_warning = False
 
     # Use explicit centimeter units from the data, so point/curve radii are not scene-relative.
     ps.set_autoscale_structures(False)
     ps.init()
     ps.set_automatically_compute_scene_extents(False)
-    ps.set_bounding_box(bbox_low, bbox_high)
-    ps.set_length_scale(length_scale)
 
-    ps.register_surface_mesh("source body", source_body_vertices_np, source_body_faces_np)
-    source_garment = ps.register_surface_mesh(
-        "source garment",
-        source_garment_vertices_np,
-        source_garment_faces_np,
-        transparency=0.45,
-    )
-    ps.register_surface_mesh(
-        "target body",
-        shifted_target_body_vertices_np,
-        target_body_faces_np,
-    )
-    warped_garment = ps.register_surface_mesh(
-        "warped garment",
-        shifted_candidate_vertices_np,
-        source_garment_faces_np,
-        transparency=0.45,
-    )
+    def register_scene() -> None:
+        nonlocal target_shift
+        nonlocal source_garment, warped_garment, relaxation_displacements, rebound_points, rebound_displacements
 
-    source_closest_points = ps.register_point_cloud("source closest body points", source_closest_points_np)
-    source_closest_points.set_radius(0.1, relative=False)
+        ps.remove_all_structures()
 
-    source_segments = source_closest_points_np.repeat(2, axis=0)
-    source_segments[1::2] = source_garment_vertices_np
-    source_edges = np.arange(source_garment_vertices_np.shape[0] * 2, dtype=np.int32).reshape(-1, 2)
-    source_displacements = ps.register_curve_network("source binding displacements", source_segments, source_edges)
-    source_displacements.set_radius(0.03, relative=False)
+        source_body_vertices_np = manager.source_body_vertices.numpy()
+        source_body_faces_np = manager.source_body_faces.numpy()
+        source_garment_vertices_np = manager.garment_vertices.numpy()
+        source_garment_faces_np = manager.garment_faces.numpy()
+        target_body_vertices_np = manager.target_body_vertices.numpy()
+        target_body_faces_np = manager.target_body_faces.numpy()
+        source_closest_points_np = manager.initial_warp.source_binding.closest_points.numpy()
+        target_anchor_points_np = manager.initial_warp.target_anchor_points.numpy()
+        candidate_vertices_np = manager.current_candidate_vertices.numpy()
 
-    anchors = ps.register_point_cloud("target anchor points", shifted_target_anchor_points_np)
-    anchors.set_radius(0.1, relative=False)
+        source_points = np.vstack([source_body_vertices_np, source_garment_vertices_np])
+        target_points = np.vstack([target_body_vertices_np, candidate_vertices_np])
+        source_width = source_points[:, 0].max() - source_points[:, 0].min()
+        x_offset = source_width + 10.0
+        target_shift = np.array([x_offset, 0.0, 0.0], dtype=np.float32)
 
-    segments = shifted_target_anchor_points_np.repeat(2, axis=0)
-    segments[1::2] = shifted_candidate_vertices_np
-    edges = np.arange(candidate_vertices_np.shape[0] * 2, dtype=np.int32).reshape(-1, 2)
-    displacements = ps.register_curve_network("reoriented displacements", segments, edges)
-    displacements.set_radius(0.03, relative=False)
+        shifted_target_body_vertices_np = target_body_vertices_np + target_shift
+        shifted_target_anchor_points_np = target_anchor_points_np + target_shift
+        shifted_candidate_vertices_np = candidate_vertices_np + target_shift
 
-    relaxed_segments = shifted_candidate_vertices_np.repeat(2, axis=0)
-    relaxed_edges = np.arange(candidate_vertices_np.shape[0] * 2, dtype=np.int32).reshape(-1, 2)
-    relaxation_displacements = ps.register_curve_network(
-        "relaxation displacements",
-        relaxed_segments,
-        relaxed_edges,
-        enabled=False,
-    )
-    relaxation_displacements.set_radius(0.03, relative=False)
+        scene_points = np.vstack(
+            [
+                source_body_vertices_np,
+                source_garment_vertices_np,
+                shifted_target_body_vertices_np,
+                shifted_candidate_vertices_np,
+            ]
+        )
+        bbox_low = scene_points.min(axis=0)
+        bbox_high = scene_points.max(axis=0)
+        ps.set_bounding_box(bbox_low, bbox_high)
+        ps.set_length_scale(np.linalg.norm(bbox_high - bbox_low))
 
-    rebound_points = ps.register_point_cloud(
-        "rebound closest points",
-        shifted_target_anchor_points_np,
-        enabled=False,
-    )
-    rebound_points.set_radius(0.1, relative=False)
+        ps.register_surface_mesh("source body", source_body_vertices_np, source_body_faces_np)
+        source_garment = ps.register_surface_mesh(
+            "source garment",
+            source_garment_vertices_np,
+            source_garment_faces_np,
+            transparency=0.45 if garment_translucent else 1.0,
+        )
+        ps.register_surface_mesh(
+            "target body",
+            shifted_target_body_vertices_np,
+            target_body_faces_np,
+        )
+        warped_garment = ps.register_surface_mesh(
+            "warped garment",
+            shifted_candidate_vertices_np,
+            source_garment_faces_np,
+            transparency=0.45 if garment_translucent else 1.0,
+        )
 
-    rebound_segments = shifted_candidate_vertices_np.repeat(2, axis=0)
-    rebound_displacements = ps.register_curve_network(
-        "rebound displacements",
-        rebound_segments,
-        relaxed_edges,
-        enabled=False,
-    )
-    rebound_displacements.set_radius(0.03, relative=False)
+        source_closest_points = ps.register_point_cloud("source closest body points", source_closest_points_np)
+        source_closest_points.set_radius(0.1, relative=False)
 
-    garment_translucent = True
-    auto_run_until_converged = False
-    show_max_iteration_warning = False
-    rebinding_method_index = REBINDING_METHODS.index(manager.rebinding_method)
+        source_segments = source_closest_points_np.repeat(2, axis=0)
+        source_segments[1::2] = source_garment_vertices_np
+        source_edges = np.arange(source_garment_vertices_np.shape[0] * 2, dtype=np.int32).reshape(-1, 2)
+        source_displacements = ps.register_curve_network("source binding displacements", source_segments, source_edges)
+        source_displacements.set_radius(0.03, relative=False)
+
+        anchors = ps.register_point_cloud("target anchor points", shifted_target_anchor_points_np)
+        anchors.set_radius(0.1, relative=False)
+
+        segments = shifted_target_anchor_points_np.repeat(2, axis=0)
+        segments[1::2] = shifted_candidate_vertices_np
+        edges = np.arange(candidate_vertices_np.shape[0] * 2, dtype=np.int32).reshape(-1, 2)
+        displacements = ps.register_curve_network("reoriented displacements", segments, edges)
+        displacements.set_radius(0.03, relative=False)
+
+        relaxed_segments = shifted_candidate_vertices_np.repeat(2, axis=0)
+        relaxed_edges = np.arange(candidate_vertices_np.shape[0] * 2, dtype=np.int32).reshape(-1, 2)
+        relaxation_displacements = ps.register_curve_network(
+            "relaxation displacements",
+            relaxed_segments,
+            relaxed_edges,
+            enabled=False,
+        )
+        relaxation_displacements.set_radius(0.03, relative=False)
+
+        rebound_points = ps.register_point_cloud(
+            "rebound closest points",
+            shifted_target_anchor_points_np,
+            enabled=False,
+        )
+        rebound_points.set_radius(0.1, relative=False)
+
+        rebound_segments = shifted_candidate_vertices_np.repeat(2, axis=0)
+        rebound_displacements = ps.register_curve_network(
+            "rebound displacements",
+            rebound_segments,
+            relaxed_edges,
+            enabled=False,
+        )
+        rebound_displacements.set_radius(0.03, relative=False)
+
+    def reset_iteration_display() -> None:
+        manager.reset()
+        shifted_candidate_vertices_np = manager.current_candidate_vertices.numpy() + target_shift
+        warped_garment.update_vertex_positions(shifted_candidate_vertices_np)
+        relaxation_displacements.set_enabled(False)
+        rebound_points.set_enabled(False)
+        rebound_displacements.set_enabled(False)
 
     def update_relaxation_display(previous_vertices, relaxed_vertices) -> None:
         shifted_previous_vertices_np = previous_vertices.numpy() + target_shift
@@ -162,7 +172,28 @@ def main() -> None:
         rebound_displacements.set_enabled(True)
 
     def callback() -> None:
-        nonlocal garment_translucent, auto_run_until_converged, rebinding_method_index, show_max_iteration_warning
+        nonlocal auto_run_until_converged, garment_translucent, manager, rebinding_method_index
+        nonlocal show_max_iteration_warning, source_set_index, target_set_index
+
+        changed, source_set_index = psim.Combo("source set", source_set_index, set_ids)
+        if changed:
+            manager = build_manager(
+                set_ids[source_set_index],
+                set_ids[target_set_index],
+                REBINDING_METHODS[rebinding_method_index],
+            )
+            register_scene()
+            auto_run_until_converged = False
+            show_max_iteration_warning = False
+
+        changed, target_set_index = psim.Combo("target set", target_set_index, set_ids)
+        if changed:
+            target_body_vertices, target_body_faces, _, _ = load_mesh_set(set_ids[target_set_index])
+            manager.change_target_body(target_body_vertices, target_body_faces)
+            register_scene()
+            auto_run_until_converged = False
+            show_max_iteration_warning = False
+
         changed, garment_translucent = psim.Checkbox("translucent garments", garment_translucent)
         if changed:
             transparency = 0.45 if garment_translucent else 1.0
@@ -201,19 +232,34 @@ def main() -> None:
                 show_max_iteration_warning = not stats.converged
 
         if psim.Button("reset"):
-            manager.reset()
-            warped_garment.update_vertex_positions(shifted_candidate_vertices_np)
-            relaxation_displacements.set_enabled(False)
-            rebound_points.set_enabled(False)
-            rebound_displacements.set_enabled(False)
+            reset_iteration_display()
             auto_run_until_converged = False
             show_max_iteration_warning = False
 
         if show_max_iteration_warning:
             psim.TextColored((1.0, 0.3, 0.2, 1.0), "Warning: reached max iterations before convergence.")
 
+    register_scene()
     ps.set_user_callback(callback)
     ps.show()
+
+
+def build_manager(
+    source_set_id: str,
+    target_set_id: str,
+    rebinding_method: str,
+) -> GarmentRefittingManager:
+    source_body_vertices, source_body_faces, source_garment_vertices, source_garment_faces = load_mesh_set(source_set_id)
+    target_body_vertices, target_body_faces, _, _ = load_mesh_set(target_set_id)
+    return GarmentRefittingManager(
+        source_garment_vertices,
+        source_garment_faces,
+        source_body_vertices,
+        source_body_faces,
+        target_body_vertices,
+        target_body_faces,
+        rebinding_method=rebinding_method,
+    )
 
 
 if __name__ == "__main__":

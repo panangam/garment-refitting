@@ -1,6 +1,13 @@
 import torch
 
-from example_data import DEFAULT_SOURCE_SET_ID, DEFAULT_TARGET_SET_ID, load_default_test_pair, load_mesh_set, mesh_set_paths
+from example_data import (
+    DEFAULT_SOURCE_SET_ID,
+    DEFAULT_TARGET_SET_ID,
+    list_mesh_set_ids,
+    load_default_test_pair,
+    load_mesh_set,
+    mesh_set_paths,
+)
 
 
 def test_default_test_pair_files_exist():
@@ -26,6 +33,14 @@ def test_load_mesh_set_loads_body_and_garment_tensors():
     assert body_faces.shape[1] == 3
     assert garment_vertices.shape[1] == 3
     assert garment_faces.shape[1] == 3
+
+
+def test_list_mesh_set_ids_includes_default_sets():
+    """Checks the dropdown set-id helper discovers the default source and target sets."""
+    set_ids = list_mesh_set_ids()
+
+    assert DEFAULT_SOURCE_SET_ID in set_ids
+    assert DEFAULT_TARGET_SET_ID in set_ids
 
 
 def test_default_test_pair_loads_expected_meshes():

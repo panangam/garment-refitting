@@ -49,6 +49,7 @@ class GarmentRefittingManager:
         self.tightness_weight = tightness_weight
         self.max_iterations = max_iterations
         self.rebinding_method = rebinding_method
+        self._automatic_tolerance = tolerance is None
 
         self.initial_warp = compute_initial_warp(
             garment_vertices,
@@ -81,10 +82,40 @@ class GarmentRefittingManager:
         self.history: list[IterationStats] = []
         self.converged = False
 
-        bbox_points = torch.cat([source_body_vertices, target_body_vertices, garment_vertices], dim=0)
+        self.tolerance = 0.0
+        self._update_tolerance(tolerance)
+        self.reset()
+
+    def change_target_body(
+        self,
+        target_body_vertices: torch.Tensor,
+        target_body_faces: torch.Tensor,
+    ) -> None:
+        self.target_body_vertices = target_body_vertices
+        self.target_body_faces = target_body_faces
+        self.initial_warp = compute_initial_warp(
+            self.garment_vertices,
+            self.source_body_vertices,
+            self.source_body_faces,
+            target_body_vertices,
+            target_body_faces,
+        )
+        self.target_face_frame_field = compute_face_frame_field(
+            target_body_vertices,
+            target_body_faces,
+            n_sym=1,
+        )
+        if self._automatic_tolerance:
+            self._update_tolerance(None)
+        self.reset()
+
+    def _update_tolerance(self, tolerance: float | None) -> None:
+        bbox_points = torch.cat(
+            [self.source_body_vertices, self.target_body_vertices, self.garment_vertices],
+            dim=0,
+        )
         bbox_size = torch.linalg.norm(torch.max(bbox_points, dim=0).values - torch.min(bbox_points, dim=0).values)
         self.tolerance = float(0.0001 * bbox_size) if tolerance is None else tolerance
-        self.reset()
 
     def reset(self) -> None:
         self.current_candidate_vertices = self.initial_warp.candidate_vertices

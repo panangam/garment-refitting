@@ -28,6 +28,14 @@ def mesh_set_paths(set_id: str, data_root: Path = PROJECT_ROOT / "data") -> tupl
     return body_paths[0], garment_path
 
 
+def list_mesh_set_ids(data_root: Path = PROJECT_ROOT / "data") -> list[str]:
+    return sorted(
+        path.name
+        for path in data_root.iterdir()
+        if path.is_dir() and (path / f"{path.name}_sim.ply").exists() and len(list(path.glob("*_apart.obj"))) == 1
+    )
+
+
 def load_mesh_set(
     set_id: str,
     data_root: Path = PROJECT_ROOT / "data",
