@@ -20,6 +20,7 @@ def test_manager_initializes_preprocessed_state_and_initial_candidate_vertices()
     assert manager.current_relaxed_vertices is None
     assert manager.relaxation_system.solver is manager.relaxation_system.solver
     assert len(manager.affine_weights.stencils) == garment_vertices.shape[0]
+    assert manager.target_face_frame_field.frames.shape == (body_faces.shape[0], 3, 3)
 
 
 def test_manager_can_run_relaxation_and_rebinding_steps_individually():
@@ -41,6 +42,48 @@ def test_manager_can_run_relaxation_and_rebinding_steps_individually():
     assert manager.last_rebinding is rebinding
     assert manager.current_candidate_vertices is rebinding.candidate_vertices
     assert rebinding.candidate_vertices.shape == garment_vertices.shape
+
+
+def test_manager_can_run_directional_field_rebinding_step():
+    """Verifies the manager can switch to the cached directional-field rebinding path."""
+    garment_vertices, garment_faces, body_vertices, body_faces = _garment_and_body_meshes()
+    manager = GarmentRefittingManager(
+        garment_vertices,
+        garment_faces,
+        body_vertices,
+        body_faces,
+        body_vertices,
+        body_faces,
+        rebinding_method="directional_field",
+    )
+
+    relaxed_vertices = manager.run_relaxation_step()
+    rebinding = manager.run_rebinding_step()
+
+    assert manager.current_relaxed_vertices is relaxed_vertices
+    assert manager.last_rebinding is rebinding
+    assert rebinding.candidate_vertices.shape == garment_vertices.shape
+    assert bool(torch.isfinite(rebinding.candidate_vertices).all())
+
+
+def test_manager_can_run_normal_aligned_rebinding_step():
+    """Verifies the manager can still use the normal-aligned fallback path."""
+    garment_vertices, garment_faces, body_vertices, body_faces = _garment_and_body_meshes()
+    manager = GarmentRefittingManager(
+        garment_vertices,
+        garment_faces,
+        body_vertices,
+        body_faces,
+        body_vertices,
+        body_faces,
+        rebinding_method="normal_aligned",
+    )
+
+    manager.run_relaxation_step()
+    rebinding = manager.run_rebinding_step()
+
+    assert rebinding.candidate_vertices.shape == garment_vertices.shape
+    assert bool(torch.isfinite(rebinding.candidate_vertices).all())
 
 
 def test_manager_run_iteration_records_finite_history():
@@ -130,27 +173,24 @@ def test_manager_reset_restores_initial_warp_state_and_keeps_preprocessing():
 
 
 def _garment_and_body_meshes():
-    garment_vertices = torch.tensor(
+    body_vertices = torch.tensor(
         [
-            [0.0, 0.0, 0.2],
-            [1.0, 0.0, 0.2],
-            [0.0, 1.0, 0.2],
-            [0.0, 0.0, 1.2],
-            [1.0, 1.0, 0.7],
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
         ],
         dtype=torch.float32,
     )
-    garment_faces = torch.tensor(
+    body_faces = torch.tensor(
         [
-            [0, 1, 2],
+            [0, 2, 1],
             [0, 1, 3],
-            [0, 1, 4],
+            [0, 3, 2],
             [1, 2, 3],
-            [1, 2, 4],
         ],
         dtype=torch.int32,
     )
-    body_vertices = garment_vertices.clone()
-    body_vertices[:, 2] = 0.0
-    body_faces = garment_faces.clone()
+    garment_vertices = body_vertices + torch.tensor([0.0, 0.0, 0.2], dtype=torch.float32)
+    garment_faces = body_faces.clone()
     return garment_vertices, garment_faces, body_vertices, body_faces

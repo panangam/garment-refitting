@@ -5,8 +5,9 @@ from dataclasses import dataclass
 import torch
 
 from refitting.affine_stencil import AffineStencilWeights, construct_affine_stencil_weights
+from refitting.directional_field import compute_face_frame_field
 from refitting.initial_warp import InitialWarp, compute_initial_warp
-from refitting.rebinding import Rebinding, rebind_candidates_normal_aligned
+from refitting.rebinding import Rebinding, rebind_candidates_directional_field, rebind_candidates_normal_aligned
 from refitting.relaxation import RelaxationSystem, assemble_relaxation_system, solve_relaxation
 
 
@@ -33,7 +34,12 @@ class GarmentRefittingManager:
         tightness_weight: float = 1.0,
         max_iterations: int = 25,
         tolerance: float | None = None,
+        rebinding_method: str = "directional_field",
     ) -> None:
+        assert rebinding_method in {
+            "normal_aligned",
+            "directional_field",
+        }, "rebinding_method must be 'normal_aligned' or 'directional_field'."
         self.garment_vertices = garment_vertices
         self.garment_faces = garment_faces
         self.source_body_vertices = source_body_vertices
@@ -42,6 +48,7 @@ class GarmentRefittingManager:
         self.target_body_faces = target_body_faces
         self.tightness_weight = tightness_weight
         self.max_iterations = max_iterations
+        self.rebinding_method = rebinding_method
 
         self.initial_warp = compute_initial_warp(
             garment_vertices,
@@ -49,6 +56,11 @@ class GarmentRefittingManager:
             source_body_faces,
             target_body_vertices,
             target_body_faces,
+        )
+        self.target_face_frame_field = compute_face_frame_field(
+            target_body_vertices,
+            target_body_faces,
+            n_sym=1,
         )
         self.affine_weights = construct_affine_stencil_weights(
             garment_vertices,
@@ -94,14 +106,24 @@ class GarmentRefittingManager:
         if self.current_relaxed_vertices is None:
             self.run_relaxation_step()
 
-        self.last_rebinding = rebind_candidates_normal_aligned(
-            self.current_relaxed_vertices,
-            self.target_body_vertices,
-            self.target_body_faces,
-            self.initial_warp.source_binding.closest_points,
-            self.initial_warp.source_binding.normals,
-            self.garment_vertices,
-        )
+        if self.rebinding_method == "normal_aligned":
+            self.last_rebinding = rebind_candidates_normal_aligned(
+                self.current_relaxed_vertices,
+                self.target_body_vertices,
+                self.target_body_faces,
+                self.initial_warp.source_binding.closest_points,
+                self.initial_warp.source_binding.normals,
+                self.garment_vertices,
+            )
+        else:
+            self.last_rebinding = rebind_candidates_directional_field(
+                self.current_relaxed_vertices,
+                self.target_body_vertices,
+                self.target_body_faces,
+                self.initial_warp.source_binding.face_ids,
+                self.initial_warp.reoriented_displacements,
+                self.target_face_frame_field,
+            )
         self.current_candidate_vertices = self.last_rebinding.candidate_vertices
         return self.last_rebinding
 

@@ -1,7 +1,8 @@
 import torch
 
+from refitting.directional_field import compute_face_frame_field
 from refitting.initial_warp import compute_initial_warp
-from refitting.rebinding import rebind_candidates_normal_aligned
+from refitting.rebinding import rebind_candidates_directional_field, rebind_candidates_normal_aligned
 
 
 def test_rebind_candidates_normal_aligned_outputs_finite_candidates():
@@ -63,6 +64,43 @@ def test_rebind_candidates_normal_aligned_is_stable_when_binding_does_not_change
         initial_warp.source_binding.closest_points,
         initial_warp.source_binding.normals,
         garment_vertices,
+    )
+
+    torch.testing.assert_close(
+        rebinding.candidate_vertices,
+        initial_warp.candidate_vertices,
+        atol=1e-6,
+        rtol=0.0,
+    )
+
+
+def test_rebind_candidates_directional_field_is_stable_when_binding_does_not_change():
+    """Verifies field-frame rebinding preserves candidates when closest faces stay fixed."""
+    body_vertices, body_faces = _body_mesh()
+    garment_vertices = torch.tensor(
+        [
+            [0.2, 0.2, 0.5],
+            [0.7, 0.2, 0.25],
+            [0.2, 0.7, -0.3],
+        ],
+        dtype=torch.float32,
+    )
+    initial_warp = compute_initial_warp(
+        garment_vertices,
+        body_vertices,
+        body_faces,
+        body_vertices,
+        body_faces,
+    )
+    face_frame_field = compute_face_frame_field(body_vertices, body_faces)
+
+    rebinding = rebind_candidates_directional_field(
+        initial_warp.candidate_vertices,
+        body_vertices,
+        body_faces,
+        initial_warp.source_binding.face_ids,
+        initial_warp.reoriented_displacements,
+        face_frame_field,
     )
 
     torch.testing.assert_close(
