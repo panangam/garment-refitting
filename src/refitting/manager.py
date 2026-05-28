@@ -1,3 +1,25 @@
+"""Documented entry point for the garment refitting pipeline.
+
+The main API is :class:`GarmentRefittingManager`. It owns the reusable
+preprocessing for one source garment/body pair and one target body:
+
+- initial closest-point warp from source body to target body,
+- target-body smooth face direction frames for directional-field rebinding,
+- garment affine stencil weights and the sparse relaxation system,
+- per-iteration relaxed vertices, rebound candidate vertices, and convergence
+  statistics.
+
+Construct the manager with CPU torch tensors:
+
+- ``garment_vertices`` and body vertices as ``(n, 3)`` ``float32`` tensors,
+- ``garment_faces`` and body faces as ``(m, 3)`` ``int32`` tensors.
+
+The default rebinding method is ``"directional_field"``, which transports each
+source displacement through the target body's cached face frame field. Use
+``run_relaxation_step()`` and ``run_rebinding_step()`` for manual inspection, or
+``run_until_converged()`` for the full alternating solve.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -29,6 +51,15 @@ class IterationStats:
 
 
 class GarmentRefittingManager:
+    """Manage preprocessing, iteration state, and solves for garment refitting.
+
+    The manager is intentionally stateful: each relaxation step consumes the
+    latest rebound candidate vertices, and each rebinding step consumes the
+    latest relaxed vertices. ``reset()`` returns the garment to the initial warp.
+    ``change_target_body()`` keeps garment-side preprocessing but recomputes the
+    target-dependent warp and direction frames.
+    """
+
     def __init__(
         self,
         garment_vertices: torch.Tensor,
@@ -42,6 +73,34 @@ class GarmentRefittingManager:
         tolerance: float | None = None,
         rebinding_method: str = "directional_field",
     ) -> None:
+        """Precompute reusable state for refitting one garment to one target body.
+
+        Args:
+            garment_vertices: Source garment vertices as an ``(n, 3)`` float32
+                tensor.
+            garment_faces: Source garment triangle faces as an ``(m, 3)`` int32
+                tensor.
+            source_body_vertices: Source body vertices as an ``(n, 3)`` float32
+                tensor.
+            source_body_faces: Source body triangle faces as an ``(m, 3)`` int32
+                tensor.
+            target_body_vertices: Target body vertices as an ``(n, 3)`` float32
+                tensor.
+            target_body_faces: Target body triangle faces as an ``(m, 3)`` int32
+                tensor.
+            tightness_weight: Weight for the garment-to-candidate positional
+                term in the relaxation solve.
+            max_iterations: Maximum number of relaxation/rebinding iterations
+                used by ``run_until_converged()``.
+            tolerance: Convergence tolerance for maximum vertex movement. If
+                ``None``, a scale-relative tolerance is computed.
+            rebinding_method: Rebinding method name, either
+                ``"directional_field"`` or ``"normal_aligned"``.
+
+        Returns:
+            None.
+        """
+
         assert rebinding_method in {
             "normal_aligned",
             "directional_field",
@@ -106,6 +165,21 @@ class GarmentRefittingManager:
         target_body_vertices: torch.Tensor,
         target_body_faces: torch.Tensor,
     ) -> None:
+        """Switch to a new target body while keeping garment-side preprocessing.
+
+        This recomputes the initial warp and target face frames, then resets the
+        current relaxed/rebound state to the new initial warp.
+
+        Args:
+            target_body_vertices: New target body vertices as an ``(n, 3)``
+                float32 tensor.
+            target_body_faces: New target body triangle faces as an ``(m, 3)``
+                int32 tensor.
+
+        Returns:
+            None.
+        """
+
         self.target_body_vertices = target_body_vertices
         self.target_body_faces = target_body_faces
         self.initial_warp = compute_initial_warp(
@@ -125,6 +199,16 @@ class GarmentRefittingManager:
         self.reset()
 
     def change_tightness_weight(self, tightness_weight: float) -> None:
+        """Rebuild the relaxation system with a new tightness weight and reset.
+
+        Args:
+            tightness_weight: New weight for the garment-to-candidate positional
+                term in the relaxation solve.
+
+        Returns:
+            None.
+        """
+
         self.tightness_weight = tightness_weight
         self.relaxation_system = assemble_relaxation_system(
             self.garment_vertices.shape[0],
@@ -135,6 +219,16 @@ class GarmentRefittingManager:
         self.reset()
 
     def _update_tolerance(self, tolerance: float | None) -> None:
+        """Set convergence tolerance.
+
+        Args:
+            tolerance: Explicit maximum-movement convergence tolerance. If
+                ``None``, use a bounding-box-relative value.
+
+        Returns:
+            None.
+        """
+
         bbox_points = torch.cat(
             [self.source_body_vertices, self.target_body_vertices, self.garment_vertices],
             dim=0,
@@ -143,6 +237,12 @@ class GarmentRefittingManager:
         self.tolerance = float(0.0001 * bbox_size) if tolerance is None else tolerance
 
     def reset(self) -> None:
+        """Return iteration state to the current initial warp.
+
+        Returns:
+            None.
+        """
+
         self.current_candidate_vertices = self.initial_warp.candidate_vertices
         self.current_relaxed_vertices = None
         self.last_rebinding = None
@@ -150,6 +250,12 @@ class GarmentRefittingManager:
         self.converged = False
 
     def run_relaxation_step(self) -> torch.Tensor:
+        """Solve one relaxation step from the latest rebound candidate vertices.
+
+        Returns:
+            Relaxed garment vertices as an ``(n, 3)`` float32 tensor.
+        """
+
         self.current_relaxed_vertices = solve_relaxation(
             self.relaxation_system,
             self.current_candidate_vertices,
@@ -157,6 +263,18 @@ class GarmentRefittingManager:
         return self.current_relaxed_vertices
 
     def run_rebinding_step(self) -> Rebinding:
+        """Project the latest relaxed garment back to the target body.
+
+        If no relaxation step has been run since reset, this rebinds the current
+        candidate vertices directly. The returned ``Rebinding`` also becomes
+        ``last_rebinding`` and its candidate vertices become the next iteration's
+        input.
+
+        Returns:
+            Rebinding result containing closest-point target binding data and
+            the next candidate garment vertices.
+        """
+
         relaxed_vertices = (
             self.current_candidate_vertices
             if self.current_relaxed_vertices is None
@@ -185,6 +303,12 @@ class GarmentRefittingManager:
         return self.last_rebinding
 
     def run_iteration(self) -> IterationStats:
+        """Run one relaxation/rebinding iteration and append convergence stats.
+
+        Returns:
+            Statistics for the completed iteration.
+        """
+
         previous_vertices = self.current_candidate_vertices
         relaxed_vertices = self.run_relaxation_step()
         movement = torch.linalg.norm(relaxed_vertices - previous_vertices, dim=1)
@@ -205,6 +329,12 @@ class GarmentRefittingManager:
         return stats
 
     def run_until_converged(self) -> list[IterationStats]:
+        """Run iterations until convergence or ``max_iterations`` is reached.
+
+        Returns:
+            The accumulated per-iteration statistics.
+        """
+
         while not self.converged:
             self.run_iteration()
         return self.history
