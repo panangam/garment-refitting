@@ -6,6 +6,39 @@ This repository is a research implementation of garment refitting for body shape
 
 The implementation uses PyTorch tensors as the main in-memory data format for vertices, faces, sparse matrices, and intermediate geometry. Mesh closest-point queries and mass matrices use libigl, relaxation is solved with a prefactored sparse Cholesky system, and a narrow C++/nanobind binding to geometry-central provides the smooth face direction field and face tangent frames used by directional-field rebinding.
 
+## Installation
+
+Clone the repository with submodules, since the C++ geometry component is brought in that way:
+
+```bash
+git clone --recurse-submodules <repo-url>
+cd garment-refitting
+```
+
+Then install the package locally:
+
+```bash
+pip install .
+```
+
+The project includes a C++ component based on `geometrycentral` for directional-field geometry computations; `pip install .` should build it automatically.
+
+## Basic Usage
+
+```python
+from refitting.manager import GarmentRefittingManager
+
+manager = GarmentRefittingManager(
+    garment_vertices,  # torch.float32, (n_garment_vertices, 3)
+    garment_faces,  # torch.int32, (n_garment_faces, 3)
+    source_body_vertices,  # torch.float32, (n_body_vertices, 3)
+    source_body_faces,  # torch.int32, (n_body_faces, 3)
+    target_body_vertices,  # torch.float32, (n_body_vertices, 3)
+    target_body_faces,  # torch.int32, (n_body_faces, 3)
+)
+refit_garment_vertices = manager.refit()
+```
+
 ## Data Format
 
 Example data, taken from GarmentCodeData, lives under `data/<sample_id>/`. Each sample includes a body mesh as an `*_apart.obj` file and a simulated source garment as an `*_sim.ply` file.

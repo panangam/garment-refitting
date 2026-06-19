@@ -258,6 +258,29 @@ def test_manager_run_until_converged_respects_max_iterations():
     assert manager.converged
 
 
+def test_manager_refit_returns_last_relaxed_garment_and_keeps_history():
+    """Checks the simple entry point returns final garment vertices while preserving stats."""
+    garment_vertices, garment_faces, body_vertices, body_faces = _garment_and_body_meshes()
+    target_body_vertices = body_vertices.clone()
+    target_body_vertices[:, 0] += 0.25
+    manager = GarmentRefittingManager(
+        garment_vertices,
+        garment_faces,
+        body_vertices,
+        body_faces,
+        target_body_vertices,
+        body_faces,
+        max_iterations=2,
+        tolerance=0.0,
+    )
+
+    refit_vertices = manager.refit()
+
+    assert refit_vertices is manager.current_relaxed_vertices
+    assert manager.converged
+    assert len(manager.history) <= 2
+
+
 def test_manager_reset_restores_initial_warp_state_and_keeps_preprocessing():
     """Checks reset clears iteration state while preserving cached preprocessing and solver."""
     garment_vertices, garment_faces, body_vertices, body_faces = _garment_and_body_meshes()

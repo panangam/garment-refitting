@@ -338,3 +338,20 @@ class GarmentRefittingManager:
         while not self.converged:
             self.run_iteration()
         return self.history
+
+    def refit(self) -> torch.Tensor:
+        """Run the standard solve and return the final refit garment vertices.
+
+        This is the simple entry point for the common use case where only the
+        last relaxed garment is needed. Per-iteration convergence statistics
+        remain available afterward through ``manager.history``; use
+        ``run_until_converged()`` directly when you want the history as the
+        return value.
+
+        Returns:
+            Final relaxed garment vertices as an ``(n, 3)`` float32 tensor.
+        """
+
+        self.run_until_converged()
+        assert self.current_relaxed_vertices is not None
+        return self.current_relaxed_vertices
