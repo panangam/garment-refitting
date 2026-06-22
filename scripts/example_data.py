@@ -22,8 +22,8 @@ def load_triangle_mesh(path: Path, scale: float = 1.0) -> tuple[torch.Tensor, to
 
 def mesh_set_paths(set_id: str, data_root: Path = PROJECT_ROOT / "data") -> tuple[Path, Path]:
     set_dir = data_root / set_id
-    body_paths = sorted(set_dir.glob("*_apart.obj"))
-    assert len(body_paths) == 1, f"Expected exactly one body mesh matching '*_apart.obj' in {set_dir}."
+    body_paths = sorted(set_dir.glob("*_*.obj"))
+    assert len(body_paths) == 1, f"Expected exactly one body mesh matching '*_*.obj' in {set_dir}."
     garment_path = set_dir / f"{set_id}_sim.ply"
     return body_paths[0], garment_path
 
@@ -32,7 +32,7 @@ def list_mesh_set_ids(data_root: Path = PROJECT_ROOT / "data") -> list[str]:
     return sorted(
         path.name
         for path in data_root.iterdir()
-        if path.is_dir() and (path / f"{path.name}_sim.ply").exists() and len(list(path.glob("*_apart.obj"))) == 1
+        if path.is_dir() and (path / f"{path.name}_sim.ply").exists() and len(list(path.glob("*_*.obj"))) == 1
     )
 
 
