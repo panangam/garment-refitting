@@ -272,7 +272,7 @@ def build_manager(
     source_set_id: str,
     target_set_id: str,
     rebinding_method: str,
-    tightness_weight: float = 1.0,
+    tightness_weight: float = 0.1,
 ) -> GarmentRefittingManager:
     source_body_vertices, source_body_faces, source_garment_vertices, source_garment_faces = load_mesh_set(source_set_id)
     target_body_vertices, target_body_faces, _, _ = load_mesh_set(target_set_id)

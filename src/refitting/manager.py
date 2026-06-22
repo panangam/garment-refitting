@@ -68,7 +68,7 @@ class GarmentRefittingManager:
         source_body_faces: torch.Tensor,
         target_body_vertices: torch.Tensor,
         target_body_faces: torch.Tensor,
-        tightness_weight: float = 1.0,
+        tightness_weight: float = 0.1,
         max_iterations: int = 25,
         tolerance: float | None = None,
         rebinding_method: str = "directional_field",

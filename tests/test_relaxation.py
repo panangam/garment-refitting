@@ -47,7 +47,7 @@ def test_assemble_relaxation_system_shape_symmetry_and_positive_definite_quadrat
 
 
 def test_assemble_relaxation_system_uses_vertex_area_tightness_weights():
-    """Verifies M uses area-weighted tightness on both the matrix and RHS."""
+    """Verifies M uses mean-normalized area tightness on both the matrix and RHS."""
     affine_weights = AffineStencilWeights(stencils=[], weights=[])
     vertex_areas = torch.tensor([0.5, 2.0, 3.0], dtype=torch.float32)
     candidate_vertices = torch.tensor(
@@ -68,10 +68,12 @@ def test_assemble_relaxation_system_uses_vertex_area_tightness_weights():
     )
     relaxed = solve_relaxation(system, candidate_vertices)
 
-    torch.testing.assert_close(system.tightness_weights, 4.0 * vertex_areas)
+    expected_weights = 4.0 * vertex_areas / torch.mean(vertex_areas)
+
+    torch.testing.assert_close(system.tightness_weights, expected_weights)
     torch.testing.assert_close(
         system.matrix.to_dense(),
-        torch.diag(4.0 * vertex_areas),
+        torch.diag(expected_weights),
         atol=1e-6,
         rtol=0.0,
     )

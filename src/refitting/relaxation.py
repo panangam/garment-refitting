@@ -53,7 +53,7 @@ def assemble_relaxation_system(
     if vertex_areas is None:
         tightness_weights = torch.full((num_vertices,), tightness_weight, dtype=torch.float32)
     else:
-        tightness_weights = tightness_weight * vertex_areas
+        tightness_weights = tightness_weight * vertex_areas / torch.mean(vertex_areas)
 
     row_indices: list[int] = []
     col_indices: list[int] = []
