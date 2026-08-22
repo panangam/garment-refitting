@@ -172,6 +172,12 @@ def main() -> None:
         rebound_displacements.update_node_positions(rebound_segments)
         rebound_displacements.set_enabled(True)
 
+    def apply_pending_tightness_weight() -> None:
+        if tightness_weight == manager.tightness_weight:
+            return
+        manager.change_tightness_weight(tightness_weight)
+        register_scene()
+
     def callback() -> None:
         nonlocal auto_run_until_converged, garment_translucent, manager, rebinding_method_index, tightness_weight
         nonlocal show_max_iteration_warning, source_set_index, target_set_index
@@ -220,12 +226,11 @@ def main() -> None:
         )
         tightness_weight = max(tightness_weight, 1e-8)
         if changed:
-            manager.change_tightness_weight(tightness_weight)
-            register_scene()
             auto_run_until_converged = False
             show_max_iteration_warning = False
 
         if psim.Button("run one relaxation iteration"):
+            apply_pending_tightness_weight()
             previous_vertices = manager.current_candidate_vertices
             relaxed_vertices = manager.run_relaxation_step()
             update_relaxation_display(previous_vertices, relaxed_vertices)
@@ -235,6 +240,7 @@ def main() -> None:
             update_rebinding_display(rebinding)
 
         if psim.Button("run until converged"):
+            apply_pending_tightness_weight()
             auto_run_until_converged = True
             show_max_iteration_warning = False
 

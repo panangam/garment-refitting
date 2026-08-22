@@ -11,7 +11,12 @@
         "activityBar.foreground": "#15202b",
         "activityBar.inactiveForeground": "#15202b99",
         "activityBarBadge.background": "#16e952",
-        "activityBarBadge.foreground": "#15202b"
+        "activityBarBadge.foreground": "#15202b",
+        "activityBarTop.activeBackground": "#eb622c",
+        "activityBarTop.background": "#eb622c",
+        "activityBarTop.foreground": "#15202b",
+        "activityBarTop.inactiveForeground": "#15202b99",
+        "commandCenter.foreground": "#e7e7e7"
     },
     "peacock.color": "#d04914"
 }
