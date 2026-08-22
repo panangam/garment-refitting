@@ -80,6 +80,38 @@ def test_assemble_relaxation_system_uses_vertex_area_tightness_weights():
     torch.testing.assert_close(relaxed, candidate_vertices, atol=1e-6, rtol=0.0)
 
 
+def test_assemble_relaxation_system_decays_tightness_with_initial_distance():
+    """Checks alpha controls decay and zero alpha preserves the base tightness."""
+    affine_weights = AffineStencilWeights(stencils=[], weights=[])
+    initial_distances = torch.tensor([0.0, 2.0, 6.0], dtype=torch.float32)
+
+    decayed_system = assemble_relaxation_system(
+        3,
+        affine_weights,
+        tightness_weight=4.0,
+        initial_distances=initial_distances,
+        distance_weight_alpha=0.5,
+        include_stencil_term=False,
+    )
+    undecayed_system = assemble_relaxation_system(
+        3,
+        affine_weights,
+        tightness_weight=4.0,
+        initial_distances=initial_distances,
+        distance_weight_alpha=0.0,
+        include_stencil_term=False,
+    )
+
+    torch.testing.assert_close(
+        decayed_system.tightness_weights,
+        torch.tensor([4.0, 2.0, 1.0], dtype=torch.float32),
+    )
+    torch.testing.assert_close(
+        undecayed_system.tightness_weights,
+        torch.full((3,), 4.0, dtype=torch.float32),
+    )
+
+
 def test_solve_relaxation_with_stencil_term_disabled_returns_candidates():
     """Verifies the implicit tightness-only system solves exactly to Z."""
     affine_weights = AffineStencilWeights(stencils=[], weights=[])

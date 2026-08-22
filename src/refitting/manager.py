@@ -69,6 +69,7 @@ class GarmentRefittingManager:
         target_body_vertices: torch.Tensor,
         target_body_faces: torch.Tensor,
         tightness_weight: float = 0.1,
+        distance_weight_alpha: float = 0.0,
         max_iterations: int = 25,
         tolerance: float | None = None,
         rebinding_method: str = "directional_field",
@@ -90,6 +91,8 @@ class GarmentRefittingManager:
                 tensor.
             tightness_weight: Weight for the garment-to-candidate positional
                 term in the relaxation solve.
+            distance_weight_alpha: Strength of tightness decay with initial
+                garment-to-body distance. Zero disables distance decay.
             max_iterations: Maximum number of relaxation/rebinding iterations
                 used by ``run_until_converged()``.
             tolerance: Convergence tolerance for maximum vertex movement. If
@@ -112,6 +115,7 @@ class GarmentRefittingManager:
         self.target_body_vertices = target_body_vertices
         self.target_body_faces = target_body_faces
         self.tightness_weight = tightness_weight
+        self.distance_weight_alpha = distance_weight_alpha
         self.max_iterations = max_iterations
         self.rebinding_method = rebinding_method
         self._automatic_tolerance = tolerance is None
@@ -148,6 +152,8 @@ class GarmentRefittingManager:
             self.affine_weights,
             tightness_weight=tightness_weight,
             vertex_areas=self.garment_vertex_areas,
+            initial_distances=torch.sqrt(self.initial_warp.source_binding.distances_squared),
+            distance_weight_alpha=distance_weight_alpha,
         )
 
         self.current_candidate_vertices = self.initial_warp.candidate_vertices
@@ -198,23 +204,27 @@ class GarmentRefittingManager:
             self._update_tolerance(None)
         self.reset()
 
-    def change_tightness_weight(self, tightness_weight: float) -> None:
-        """Rebuild the relaxation system with a new tightness weight and reset.
+    def change_tightness_weight(self, tightness_weight: float, distance_weight_alpha: float) -> None:
+        """Rebuild the relaxation system with new tightness parameters and reset.
 
         Args:
             tightness_weight: New weight for the garment-to-candidate positional
                 term in the relaxation solve.
+            distance_weight_alpha: New initial-distance decay scale.
 
         Returns:
             None.
         """
 
         self.tightness_weight = tightness_weight
+        self.distance_weight_alpha = distance_weight_alpha
         self.relaxation_system = assemble_relaxation_system(
             self.garment_vertices.shape[0],
             self.affine_weights,
             tightness_weight=tightness_weight,
             vertex_areas=self.garment_vertex_areas,
+            initial_distances=torch.sqrt(self.initial_warp.source_binding.distances_squared),
+            distance_weight_alpha=self.distance_weight_alpha,
         )
         self.reset()
 

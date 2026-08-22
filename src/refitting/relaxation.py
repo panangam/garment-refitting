@@ -48,12 +48,17 @@ def assemble_relaxation_system(
     affine_weights: AffineStencilWeights,
     tightness_weight: float = 1.0,
     vertex_areas: torch.Tensor | None = None,
+    initial_distances: torch.Tensor | None = None,
+    distance_weight_alpha: float = 0.0,
     include_stencil_term: bool = True,
 ) -> RelaxationSystem:
+    # scale tightness_weights by vertex area to make it dimensionless
     if vertex_areas is None:
         tightness_weights = torch.full((num_vertices,), tightness_weight, dtype=torch.float32)
     else:
         tightness_weights = tightness_weight * vertex_areas / torch.mean(vertex_areas)
+    if initial_distances is not None:
+        tightness_weights /= 1.0 + distance_weight_alpha * initial_distances
 
     row_indices: list[int] = []
     col_indices: list[int] = []

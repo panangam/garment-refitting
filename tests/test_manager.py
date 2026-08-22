@@ -162,7 +162,7 @@ def test_manager_change_tightness_weight_rebuilds_solver_and_keeps_geometry_prep
     old_solver = manager.relaxation_system.solver
     manager.run_iteration()
 
-    manager.change_tightness_weight(3.0)
+    manager.change_tightness_weight(3.0, manager.distance_weight_alpha)
 
     assert manager.tightness_weight == 3.0
     assert manager.affine_weights is affine_weights
